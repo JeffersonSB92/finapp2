@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "FinApp",
+    "slug": "finapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0D0D0D"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.jefferson.finapp",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0D0D0D"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-sqlite"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "82f89aa3-4f38-4b74-89c1-a225fec27d80"
+      }
+    },
+    "owner": "dev-jeff"
+  }
+}
