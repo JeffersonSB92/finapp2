@@ -3,6 +3,7 @@
     "name": "FinApp",
     "slug": "finapp",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
@@ -18,6 +19,7 @@
       "package": "com.jefferson.finapp",
       "versionCode": 1,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0D0D0D"
       },
       "edgeToEdgeEnabled": true
