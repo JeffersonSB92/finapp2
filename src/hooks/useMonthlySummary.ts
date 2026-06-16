@@ -50,7 +50,7 @@ function getTrendIndicator(current: number, previous: number): MonthlyTrendIndic
   if (previous === 0 && current === 0) {
     return {
       direction: 'stable',
-      label: 'Sem variacao',
+      label: 'Sem variação',
       value: '0%',
     };
   }
@@ -68,7 +68,7 @@ function getTrendIndicator(current: number, previous: number): MonthlyTrendIndic
   if (Math.abs(difference) < 0.5) {
     return {
       direction: 'stable',
-      label: 'Estavel',
+      label: 'Estável',
       value: `${difference.toFixed(0)}%`,
     };
   }
@@ -141,4 +141,3 @@ export function useMonthlySummary({
     error,
   };
 }
-

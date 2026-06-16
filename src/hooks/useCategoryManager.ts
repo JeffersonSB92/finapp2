@@ -39,7 +39,7 @@ function getTypeLabel(type: TransactionType): string {
     return 'Despesa';
   }
 
-  return 'Transferencia';
+  return 'Transferência';
 }
 
 function getIconLabel(category: Category): string {
@@ -117,4 +117,3 @@ export function useCategoryManager(): UseCategoryManagerResult {
     toggleCategory,
   };
 }
-

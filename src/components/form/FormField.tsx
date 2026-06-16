@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
 import { theme } from '../../theme/theme';
@@ -13,15 +13,32 @@ export function FormField({
   error,
   hint,
   label,
+  onBlur,
+  onFocus,
   style,
   ...props
 }: FormFieldProps): React.JSX.Element {
+  const [isFocused, setIsFocused] = useState(false);
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        onBlur={(event) => {
+          setIsFocused(false);
+          onBlur?.(event);
+        }}
+        onFocus={(event) => {
+          setIsFocused(true);
+          onFocus?.(event);
+        }}
         placeholderTextColor={theme.colors.text.muted}
-        style={[styles.input, error ? styles.inputError : null, style]}
+        style={[
+          styles.input,
+          isFocused ? styles.inputFocused : null,
+          error ? styles.inputError : null,
+          style,
+        ]}
         {...props}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -41,17 +58,21 @@ const styles = StyleSheet.create({
     lineHeight: theme.fonts.lineHeight.sm,
   },
   input: {
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.md,
+    backgroundColor: theme.colors.background.surface,
+    borderColor: theme.colors.border.soft,
+    borderRadius: theme.radii.lg,
     borderWidth: 1,
     color: theme.colors.text.primary,
     fontFamily: theme.fonts.family.regular,
     fontSize: theme.fonts.size.md,
     lineHeight: theme.fonts.lineHeight.md,
-    minHeight: 52,
+    minHeight: 50,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
+  },
+  inputFocused: {
+    borderColor: theme.colors.brand.primary,
+    backgroundColor: theme.colors.background.surfaceSoft,
   },
   inputError: {
     borderColor: theme.colors.status.error,
@@ -69,4 +90,3 @@ const styles = StyleSheet.create({
     lineHeight: theme.fonts.lineHeight.sm,
   },
 });
-

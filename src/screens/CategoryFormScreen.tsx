@@ -19,7 +19,7 @@ interface CategoryFormErrors {
 const categoryTypeOptions: OptionItem<TransactionType>[] = [
   { label: 'Receita', value: TransactionType.INCOME },
   { label: 'Despesa', value: TransactionType.EXPENSE },
-  { label: 'Transferencia', value: TransactionType.TRANSFER },
+  { label: 'Transferência', value: TransactionType.TRANSFER },
 ];
 
 function validateCategory(values: CategoryFormValues): CategoryFormErrors {
@@ -95,14 +95,14 @@ export function CategoryFormScreen(): React.JSX.Element {
       isSubmitting={isSubmitting}
       onSubmit={() => void handleSubmit()}
       submitLabel="Salvar categoria"
-      subtitle="Organize receitas, despesas e transferencias com categorias reutilizaveis."
+      subtitle="Organize receitas, despesas e transferências com categorias reutilizáveis."
       title="Nova categoria"
     >
       <FormField
         error={errors.name}
         label="Nome"
         onChangeText={(name) => setValues((current) => ({ ...current, name }))}
-        placeholder="Ex.: Alimentacao"
+        placeholder="Ex.: Alimentação"
         value={values.name}
       />
 
@@ -124,7 +124,7 @@ export function CategoryFormScreen(): React.JSX.Element {
 
       <FormField
         hint="Opcional"
-        label="Icone"
+        label="Ícone"
         onChangeText={(icon) => setValues((current) => ({ ...current, icon }))}
         placeholder="shopping-bag"
         value={values.icon}
@@ -132,4 +132,3 @@ export function CategoryFormScreen(): React.JSX.Element {
     </FormScreen>
   );
 }
-

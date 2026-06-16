@@ -72,7 +72,7 @@ export class PlanningSettingsRepository {
       );
 
       if (!created) {
-        throw new Error('Failed to create planning settings.');
+        throw new Error('Não foi possível criar as configurações de planejamento.');
       }
 
       return mapPlanningSettings(created);
@@ -104,7 +104,7 @@ export class PlanningSettingsRepository {
     );
 
     if (!updated) {
-      throw new Error('Failed to update planning settings.');
+      throw new Error('Não foi possível atualizar as configurações de planejamento.');
     }
 
     return mapPlanningSettings(updated);

@@ -58,7 +58,7 @@ export function MonthlyComparisonChart(): React.JSX.Element {
       </View>
 
       <View style={styles.chartCard}>
-        {isLoading ? <Text style={styles.feedbackText}>Carregando grafico...</Text> : null}
+        {isLoading ? <Text style={styles.feedbackText}>Carregando gráfico...</Text> : null}
         {error && !isLoading ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {!isLoading && !error ? (
@@ -246,4 +246,3 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
 });
-

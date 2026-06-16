@@ -164,7 +164,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       } catch (error) {
         set({
           isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to initialize store.',
+          error: error instanceof Error ? error.message : 'Não foi possível inicializar a loja.',
         });
         throw error;
       } finally {
@@ -210,7 +210,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to reload data.',
+        error: error instanceof Error ? error.message : 'Não foi possível recarregar os dados.',
       });
       throw error;
     }
@@ -238,7 +238,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       set({
         isSyncing: false,
         syncError:
-          error instanceof Error ? error.message : 'Failed to synchronize data.',
+          error instanceof Error ? error.message : 'Não foi possível sincronizar os dados.',
       });
     }
   },
@@ -268,7 +268,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       set({ accounts: sortAccounts(accounts), error: null });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to load accounts.',
+        error: error instanceof Error ? error.message : 'Não foi possível carregar as contas.',
       });
       throw error;
     }
@@ -282,7 +282,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to load transactions.',
+          error instanceof Error ? error.message : 'Não foi possível carregar as transações.',
       });
       throw error;
     }
@@ -296,7 +296,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to load categories.',
+          error instanceof Error ? error.message : 'Não foi possível carregar as categorias.',
       });
       throw error;
     }
@@ -310,7 +310,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to load subcategories.',
+          error instanceof Error ? error.message : 'Não foi possível carregar as subcategorias.',
       });
       throw error;
     }
@@ -323,7 +323,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       set({ planning: sortPlanning(planning), error: null });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to load planning.',
+        error: error instanceof Error ? error.message : 'Não foi possível carregar o planejamento.',
       });
       throw error;
     }
@@ -340,7 +340,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         error:
           error instanceof Error
             ? error.message
-            : 'Failed to load planning settings.',
+            : 'Não foi possível carregar as configurações de planejamento.',
       });
       throw error;
     }
@@ -356,7 +356,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       return account;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to add account.',
+        error: error instanceof Error ? error.message : 'Não foi possível adicionar a conta.',
       });
       throw error;
     }
@@ -372,7 +372,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       return account;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to update account.',
+        error: error instanceof Error ? error.message : 'Não foi possível atualizar a conta.',
       });
       throw error;
     }
@@ -388,7 +388,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       void get().syncNow();
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to remove account.',
+        error: error instanceof Error ? error.message : 'Não foi possível remover a conta.',
       });
       throw error;
     }
@@ -405,7 +405,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to add transaction.',
+          error instanceof Error ? error.message : 'Não foi possível adicionar a transação.',
       });
       throw error;
     }
@@ -425,7 +425,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to update transaction.',
+          error instanceof Error ? error.message : 'Não foi possível atualizar a transação.',
       });
       throw error;
     }
@@ -442,7 +442,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to remove transaction.',
+          error instanceof Error ? error.message : 'Não foi possível remover a transação.',
       });
       throw error;
     }
@@ -458,7 +458,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       return category;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to add category.',
+        error: error instanceof Error ? error.message : 'Não foi possível adicionar a categoria.',
       });
       throw error;
     }
@@ -475,7 +475,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to update category.',
+          error instanceof Error ? error.message : 'Não foi possível atualizar a categoria.',
       });
       throw error;
     }
@@ -492,7 +492,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to remove category.',
+          error instanceof Error ? error.message : 'Não foi possível remover a categoria.',
       });
       throw error;
     }
@@ -508,7 +508,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       return planning;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to add planning.',
+        error: error instanceof Error ? error.message : 'Não foi possível adicionar o planejamento.',
       });
       throw error;
     }
@@ -525,7 +525,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to update planning.',
+          error instanceof Error ? error.message : 'Não foi possível atualizar o planejamento.',
       });
       throw error;
     }
@@ -542,7 +542,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to remove planning.',
+          error instanceof Error ? error.message : 'Não foi possível remover o planejamento.',
       });
       throw error;
     }
@@ -562,7 +562,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         error:
           error instanceof Error
             ? error.message
-            : 'Failed to save planning settings.',
+            : 'Não foi possível salvar as configurações de planejamento.',
       });
       throw error;
     }

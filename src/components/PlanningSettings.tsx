@@ -1,9 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { usePlanningSettings } from '../hooks/usePlanningSettings';
 import { theme } from '../theme/theme';
 import { FormField, FormScreen } from './form';
+import { AppCard } from './ui';
 
 function getTotalColor(
   isBalanced: boolean,
@@ -20,7 +21,24 @@ function getTotalColor(
   return theme.colors.brand.primary;
 }
 
+function getBalanceMessage(
+  isBalanced: boolean,
+  isOverLimit: boolean,
+  remainingPercentage: number,
+): string {
+  if (isBalanced) {
+    return 'Distribuição equilibrada em 100%.';
+  }
+
+  if (isOverLimit) {
+    return `A distribuição excede 100% em ${Math.abs(remainingPercentage)}%.`;
+  }
+
+  return `Faltam ${remainingPercentage}% para fechar sua distribuição em 100%.`;
+}
+
 export function PlanningSettings(): React.JSX.Element {
+  const { width } = useWindowDimensions();
   const {
     values,
     errors,
@@ -35,59 +53,77 @@ export function PlanningSettings(): React.JSX.Element {
     submit,
   } = usePlanningSettings();
 
+  const isCompactLayout = width < 420;
+
   return (
     <FormScreen
       error={submitError}
       isSubmitting={isSubmitting}
       onSubmit={() => void submit()}
       submitLabel="Salvar planejamento"
-      subtitle="Ajuste sua distribuicao ideal e acompanhe o equilibrio financeiro em tempo real."
+      subtitle="Defina sua distribuição ideal e acompanhe o equilíbrio do plano em tempo real."
       title="Planejamento financeiro"
     >
-      <View style={styles.heroCard}>
-        <View style={styles.heroHeader}>
-          <Text style={styles.heroLabel}>Equilibrio atual</Text>
-          <Text
-            style={[
-              styles.heroValue,
-              { color: getTotalColor(isBalanced, isOverLimit) },
-            ]}
-          >
-            {totalPercentage}%
-          </Text>
+      <AppCard style={styles.heroCard}>
+        <View style={[styles.heroHeader, isCompactLayout ? styles.heroHeaderCompact : null]}>
+          <View style={styles.heroHeading}>
+            <Text style={styles.heroLabel}>Equilíbrio atual</Text>
+            <Text style={styles.heroDescription}>
+              Distribuição percentual do seu planejamento
+            </Text>
+          </View>
+
+          <View style={styles.totalPill}>
+            <Text style={styles.totalPillLabel}>Total</Text>
+            <Text
+              style={[
+                styles.totalPillValue,
+                { color: getTotalColor(isBalanced, isOverLimit) },
+              ]}
+            >
+              {totalPercentage}%
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.progressBase}>
+        <View style={styles.progressWrapper}>
+          <View style={styles.progressBase}>
+            {metrics.map((metric) => (
+              <View
+                key={metric.id}
+                style={[
+                  styles.progressSegment,
+                  {
+                    width: `${Math.max(metric.value, 0)}%`,
+                    backgroundColor: metric.color,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+
+          {totalPercentage > 100 ? (
+            <View
+              style={[
+                styles.progressOverflow,
+                { width: `${Math.min(totalPercentage - 100, 100)}%` },
+              ]}
+            />
+          ) : null}
+        </View>
+
+        <View style={[styles.metricsGrid, isCompactLayout ? styles.metricsColumn : null]}>
           {metrics.map((metric) => (
             <View
               key={metric.id}
-              style={[
-                styles.progressSegment,
-                {
-                  width: `${Math.max(metric.value, 0)}%`,
-                  backgroundColor: metric.color,
-                },
-              ]}
-            />
-          ))}
-        </View>
-
-        {totalPercentage > 100 ? (
-          <View
-            style={[
-              styles.progressOverflow,
-              { width: `${Math.min(totalPercentage - 100, 100)}%` },
-            ]}
-          />
-        ) : null}
-
-        <View style={styles.metricsGrid}>
-          {metrics.map((metric) => (
-            <View key={metric.id} style={styles.metricCard}>
+              style={[styles.metricCard, isCompactLayout ? styles.metricCardCompact : null]}
+            >
               <View
                 style={[styles.metricDot, { backgroundColor: metric.color }]}
               />
-              <Text style={styles.metricTitle}>{metric.label}</Text>
+              <Text numberOfLines={2} style={styles.metricTitle}>
+                {metric.label}
+              </Text>
               <Text style={styles.metricValue}>{metric.value}%</Text>
             </View>
           ))}
@@ -99,15 +135,11 @@ export function PlanningSettings(): React.JSX.Element {
             { color: getTotalColor(isBalanced, isOverLimit) },
           ]}
         >
-          {isBalanced
-            ? 'Distribuicao equilibrada em 100%.'
-            : isOverLimit
-              ? `Voce ultrapassou o limite em ${Math.abs(remainingPercentage)}%.`
-              : `Faltam ${remainingPercentage}% para completar seu plano.`}
+          {getBalanceMessage(isBalanced, isOverLimit, remainingPercentage)}
         </Text>
 
         {errors.total ? <Text style={styles.errorText}>{errors.total}</Text> : null}
-      </View>
+      </AppCard>
 
       <FormField
         error={errors.essential}
@@ -121,7 +153,7 @@ export function PlanningSettings(): React.JSX.Element {
       <FormField
         error={errors.nonEssential}
         keyboardType="numeric"
-        label="Nao essencial (%)"
+        label="Não essencial (%)"
         onChangeText={(value) => setField('nonEssential', value)}
         placeholder="30"
         value={values.nonEssential}
@@ -141,31 +173,60 @@ export function PlanningSettings(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   heroCard: {
-    backgroundColor: theme.colors.background.primary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
+    gap: theme.spacing.lg,
   },
   heroHeader: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
+    gap: theme.spacing.md,
     justifyContent: 'space-between',
+  },
+  heroHeaderCompact: {
+    flexDirection: 'column',
+  },
+  heroHeading: {
+    flex: 1,
+    gap: 2,
   },
   heroLabel: {
     color: theme.colors.text.secondary,
     fontFamily: theme.fonts.family.medium,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
+    textTransform: 'uppercase',
   },
-  heroValue: {
+  heroDescription: {
+    color: theme.colors.text.muted,
+    fontFamily: theme.fonts.family.regular,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
+  },
+  totalPill: {
+    backgroundColor: theme.colors.background.surfaceSoft,
+    borderColor: theme.colors.border.soft,
+    borderRadius: theme.radii.lg,
+    borderWidth: 1,
+    gap: 2,
+    minWidth: 104,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  totalPillLabel: {
+    color: theme.colors.text.muted,
+    fontFamily: theme.fonts.family.medium,
+    fontSize: theme.fonts.size.xs,
+    lineHeight: theme.fonts.lineHeight.xs,
+  },
+  totalPillValue: {
     fontFamily: theme.fonts.family.bold,
-    fontSize: theme.fonts.size['2xl'],
-    lineHeight: theme.fonts.lineHeight['2xl'],
+    fontSize: theme.fonts.size.xl,
+    lineHeight: theme.fonts.lineHeight.xl,
+  },
+  progressWrapper: {
+    gap: theme.spacing.xs,
   },
   progressBase: {
-    backgroundColor: theme.colors.background.secondary,
+    backgroundColor: theme.colors.background.surfaceSoft,
     borderRadius: theme.radii.pill,
     flexDirection: 'row',
     height: 16,
@@ -185,12 +246,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
   },
+  metricsColumn: {
+    flexDirection: 'column',
+  },
   metricCard: {
-    backgroundColor: theme.colors.background.secondary,
+    backgroundColor: theme.colors.background.surfaceSoft,
+    borderColor: theme.colors.border.soft,
     borderRadius: theme.radii.lg,
+    borderWidth: 1,
     flex: 1,
     gap: theme.spacing.xs,
+    minHeight: 112,
     padding: theme.spacing.md,
+  },
+  metricCardCompact: {
+    minHeight: 0,
   },
   metricDot: {
     borderRadius: theme.radii.pill,
@@ -198,7 +268,7 @@ const styles = StyleSheet.create({
     width: 10,
   },
   metricTitle: {
-    color: theme.colors.text.muted,
+    color: theme.colors.text.secondary,
     fontFamily: theme.fonts.family.medium,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
@@ -208,6 +278,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.family.bold,
     fontSize: theme.fonts.size.lg,
     lineHeight: theme.fonts.lineHeight.lg,
+    marginTop: 'auto',
   },
   balanceText: {
     fontFamily: theme.fonts.family.semibold,
@@ -221,4 +292,3 @@ const styles = StyleSheet.create({
     lineHeight: theme.fonts.lineHeight.sm,
   },
 });
-

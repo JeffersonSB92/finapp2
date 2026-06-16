@@ -1,6 +1,7 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AppPill } from '../ui';
 import { theme } from '../../theme/theme';
 
 export interface OptionItem<T extends string | number> {
@@ -32,20 +33,12 @@ export function OptionSelector<T extends string | number>({
             const isSelected = option.value === selectedValue;
 
             return (
-              <Pressable
+              <AppPill
                 key={String(option.value)}
+                label={option.label}
                 onPress={() => onChange(option.value)}
-                style={[styles.option, isSelected ? styles.optionSelected : null]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    isSelected ? styles.optionTextSelected : null,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
+                selected={isSelected}
+              />
             );
           })}
         </View>
@@ -70,27 +63,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     paddingRight: theme.spacing.md,
   },
-  option: {
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  optionSelected: {
-    backgroundColor: theme.colors.brand.primary,
-    borderColor: theme.colors.brand.primary,
-  },
-  optionText: {
-    color: theme.colors.text.secondary,
-    fontFamily: theme.fonts.family.medium,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
-  },
-  optionTextSelected: {
-    color: theme.colors.brand.white,
-  },
   error: {
     color: theme.colors.status.error,
     fontFamily: theme.fonts.family.medium,
@@ -98,4 +70,3 @@ const styles = StyleSheet.create({
     lineHeight: theme.fonts.lineHeight.sm,
   },
 });
-

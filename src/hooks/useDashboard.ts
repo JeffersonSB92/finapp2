@@ -1,25 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { TransactionType } from '../database';
+import { Category, TransactionType } from '../database';
 import { useFinanceStore } from '../store';
+import {
+  createMonthDate,
+  getCurrentMonthDate,
+  isSameLocalMonth,
+} from '../utils/date';
 
 type DashboardTone = 'positive' | 'negative' | 'neutral';
 type PlanningStatus = 'acima' | 'dentro' | 'abaixo';
 
-interface DashboardBaseCard {
-  id: 'saldoAtual' | 'saldoEmConta' | 'totalDespesas' | 'planejamentoFinanceiro';
+export interface DashboardMetricCard {
+  id: 'receitas' | 'despesas' | 'contasAtivas';
   title: string;
+  value: string;
+  helperText: string;
   tone: DashboardTone;
 }
 
-export interface DashboardValueCard extends DashboardBaseCard {
-  kind: 'value';
-  value: string;
-  helperText: string;
-}
-
-export interface DashboardPlanningCard extends DashboardBaseCard {
-  kind: 'planning';
+export interface DashboardPlanningSummary {
   value: string;
   helperText: string;
   plannedPercentage: number;
@@ -27,18 +27,33 @@ export interface DashboardPlanningCard extends DashboardBaseCard {
   differenceLabel: string;
   progress: number;
   badgeLabel: PlanningStatus;
+  tone: DashboardTone;
 }
 
-export type DashboardCardData = DashboardValueCard | DashboardPlanningCard;
+export interface DashboardRecentTransaction {
+  id: number;
+  title: string;
+  category: string;
+  dateLabel: string;
+  value: string;
+  type: TransactionType;
+  indicatorLabel: string;
+  indicatorColor: string;
+}
 
 export interface UseDashboardResult {
-  cards: DashboardCardData[];
+  activeAccountsCount: number;
   currentMonthLabel: string;
   currentMonthShortLabel: string;
-  isLoading: boolean;
   error: string | null;
-  goToPreviousMonth: () => void;
-  goToNextMonth: () => void;
+  isLoading: boolean;
+  latestTransactions: DashboardRecentTransaction[];
+  metrics: DashboardMetricCard[];
+  planning: DashboardPlanningSummary;
+  referenceDate: Date;
+  saldoAtual: string;
+  saldoEmConta: string;
+  selectMonth: (date: Date) => void;
 }
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -66,21 +81,28 @@ function formatShortMonthLabel(date: Date): string {
     .toUpperCase();
 }
 
-function createMonthDate(year: number, month: number): Date {
-  return new Date(Date.UTC(year, month, 1));
-}
-
-function shiftMonth(date: Date, amount: number): Date {
-  return createMonthDate(date.getUTCFullYear(), date.getUTCMonth() + amount);
-}
-
-function isSameMonth(dateIso: string, referenceDate: Date): boolean {
+function formatRecentDateLabel(dateIso: string): string {
   const date = new Date(dateIso);
+  const now = new Date();
 
-  return (
-    date.getUTCFullYear() === referenceDate.getUTCFullYear() &&
-    date.getUTCMonth() === referenceDate.getUTCMonth()
-  );
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isToday) {
+    return new Intl.DateTimeFormat('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+  })
+    .format(date)
+    .replace('.', '');
 }
 
 function getPlanningStatus(
@@ -112,15 +134,49 @@ function getToneFromStatus(status: PlanningStatus): DashboardTone {
   return 'neutral';
 }
 
+function buildCategoryMap(categories: Category[]): Map<number, Category> {
+  return new Map(categories.map((category) => [category.id, category]));
+}
+
+function getTransactionIndicator(
+  category: Category | undefined,
+  type: TransactionType,
+): { color: string; label: string } {
+  if (category?.color?.trim()) {
+    return {
+      color: category.color,
+      label: category.name.trim().charAt(0).toUpperCase(),
+    };
+  }
+
+  if (type === TransactionType.INCOME) {
+    return {
+      color: '#2E8B57',
+      label: 'R',
+    };
+  }
+
+  if (type === TransactionType.EXPENSE) {
+    return {
+      color: '#D95032',
+      label: 'D',
+    };
+  }
+
+  return {
+    color: '#7A7A7A',
+    label: 'T',
+  };
+}
+
 export function useDashboard(): UseDashboardResult {
-  const [referenceDate, setReferenceDate] = useState<Date>(
-    createMonthDate(new Date().getFullYear(), new Date().getMonth()),
-  );
+  const [referenceDate, setReferenceDate] = useState<Date>(getCurrentMonthDate());
 
   const accounts = useFinanceStore((state) => state.accounts);
-  const transactions = useFinanceStore((state) => state.transactions);
+  const categories = useFinanceStore((state) => state.categories);
   const planning = useFinanceStore((state) => state.planning);
   const planningSettings = useFinanceStore((state) => state.planningSettings);
+  const transactions = useFinanceStore((state) => state.transactions);
   const initialize = useFinanceStore((state) => state.initialize);
   const isLoading = useFinanceStore((state) => state.isLoading);
   const error = useFinanceStore((state) => state.error);
@@ -129,10 +185,15 @@ export function useDashboard(): UseDashboardResult {
     void initialize();
   }, [initialize]);
 
+  const activeAccountsCount = useMemo(
+    () => accounts.filter((account) => account.is_active).length,
+    [accounts],
+  );
+
   const monthTransactions = useMemo(
     () =>
       transactions.filter((transaction) =>
-        isSameMonth(transaction.transaction_date, referenceDate),
+        isSameLocalMonth(transaction.transaction_date, referenceDate),
       ),
     [referenceDate, transactions],
   );
@@ -173,15 +234,15 @@ export function useDashboard(): UseDashboardResult {
     [monthTransactions],
   );
 
-  const saldoAtual = totalReceitas - totalDespesas;
+  const saldoAtual = saldoEmConta + totalReceitas - totalDespesas;
 
   const monthlyPlanningTotal = useMemo(
     () =>
       planning
         .filter(
           (item) =>
-            item.year === referenceDate.getUTCFullYear() &&
-            item.month === referenceDate.getUTCMonth() + 1,
+            item.year === referenceDate.getFullYear() &&
+            item.month === referenceDate.getMonth() + 1,
         )
         .reduce((total, item) => total + item.planned_amount, 0),
     [planning, referenceDate],
@@ -211,45 +272,82 @@ export function useDashboard(): UseDashboardResult {
 
   const currentPercentage =
     totalReceitas > 0 ? (totalDespesas / totalReceitas) * 100 : 0;
-
   const planningDifference = currentPercentage - plannedPercentage;
   const planningStatus = getPlanningStatus(currentPercentage, plannedPercentage);
   const planningTone = getToneFromStatus(planningStatus);
 
-  const cards: DashboardCardData[] = [
+  const metrics: DashboardMetricCard[] = [
     {
-      id: 'saldoAtual',
-      kind: 'value',
-      title: 'Saldo Atual',
-      value: formatCurrency(saldoAtual),
-      tone: saldoAtual >= 0 ? 'positive' : 'negative',
-      helperText: `Receitas ${formatCurrency(totalReceitas)}`,
+      id: 'receitas',
+      title: 'Receitas do mês',
+      value: formatCurrency(totalReceitas),
+      helperText: `Entradas em ${formatMonthLabel(referenceDate)}`,
+      tone: totalReceitas > 0 ? 'positive' : 'neutral',
     },
     {
-      id: 'saldoEmConta',
-      kind: 'value',
-      title: 'Saldo em Conta',
-      value: formatCurrency(saldoEmConta),
-      tone: saldoEmConta >= 0 ? 'positive' : 'negative',
-      helperText: `${accounts.filter((item) => item.is_active).length} contas ativas`,
-    },
-    {
-      id: 'totalDespesas',
-      kind: 'value',
-      title: 'Total de Despesas',
+      id: 'despesas',
+      title: 'Despesas do mês',
       value: formatCurrency(totalDespesas),
+      helperText: `Saídas em ${formatMonthLabel(referenceDate)}`,
       tone: totalDespesas > 0 ? 'negative' : 'neutral',
-      helperText: `No mes de ${formatMonthLabel(referenceDate)}`,
     },
     {
-      id: 'planejamentoFinanceiro',
-      kind: 'planning',
-      title: 'Planejamento Financeiro',
+      id: 'contasAtivas',
+      title: 'Contas ativas',
+      value: String(activeAccountsCount),
+      helperText: `${formatCurrency(saldoEmConta)} em conta`,
+      tone: activeAccountsCount > 0 ? 'neutral' : 'negative',
+    },
+  ];
+
+  const categoriesById = useMemo(() => buildCategoryMap(categories), [categories]);
+
+  const latestTransactions = useMemo<DashboardRecentTransaction[]>(
+    () =>
+      [...transactions]
+        .sort(
+          (left, right) =>
+            new Date(right.transaction_date).getTime() -
+            new Date(left.transaction_date).getTime(),
+        )
+        .slice(0, 4)
+        .map((transaction) => {
+          const category = transaction.category_id
+            ? categoriesById.get(transaction.category_id)
+            : undefined;
+          const indicator = getTransactionIndicator(category, transaction.type);
+
+          return {
+            id: transaction.id,
+            title: transaction.description?.trim() || 'Transação sem título',
+            category:
+              category?.name ??
+              (transaction.type === TransactionType.TRANSFER
+                ? 'Transferência'
+                : 'Sem categoria'),
+            dateLabel: formatRecentDateLabel(transaction.transaction_date),
+            value: formatCurrency(transaction.amount),
+            type: transaction.type,
+            indicatorColor: indicator.color,
+            indicatorLabel: indicator.label,
+          };
+        }),
+    [categoriesById, transactions],
+  );
+
+  return {
+    activeAccountsCount,
+    currentMonthLabel: formatMonthLabel(referenceDate),
+    currentMonthShortLabel: formatShortMonthLabel(referenceDate),
+    error,
+    isLoading,
+    latestTransactions,
+    metrics,
+    planning: {
       value: `${currentPercentage.toFixed(0)}%`,
-      tone: planningTone,
       helperText:
         plannedPercentage > 0
-          ? `Planejado ${plannedPercentage.toFixed(0)}%`
+          ? `Meta planejada de ${plannedPercentage.toFixed(0)}%`
           : 'Sem meta definida',
       plannedPercentage,
       currentPercentage,
@@ -261,20 +359,13 @@ export function useDashboard(): UseDashboardResult {
           ? Math.min((currentPercentage / plannedPercentage) * 100, 100)
           : 0,
       badgeLabel: planningStatus,
+      tone: planningTone,
     },
-  ];
-
-  return {
-    cards,
-    currentMonthLabel: formatMonthLabel(referenceDate),
-    currentMonthShortLabel: formatShortMonthLabel(referenceDate),
-    isLoading,
-    error,
-    goToPreviousMonth: () => {
-      setReferenceDate((current) => shiftMonth(current, -1));
-    },
-    goToNextMonth: () => {
-      setReferenceDate((current) => shiftMonth(current, 1));
+    referenceDate,
+    saldoAtual: formatCurrency(saldoAtual),
+    saldoEmConta: formatCurrency(saldoEmConta),
+    selectMonth: (date: Date) => {
+      setReferenceDate(createMonthDate(date.getFullYear(), date.getMonth()));
     },
   };
 }

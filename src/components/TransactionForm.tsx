@@ -35,13 +35,13 @@ export function TransactionForm({
       error={submitError}
       isSubmitting={isSubmitting}
       onSubmit={() => void submit()}
-      submitLabel={isEditing ? 'Salvar alteracoes' : 'Salvar transacao'}
-      subtitle="Preencha os dados e mantenha seu historico sincronizado no banco local."
-      title={isEditing ? 'Editar transacao' : 'Nova transacao'}
+      submitLabel={isEditing ? 'Salvar alterações' : 'Salvar transação'}
+      subtitle="Preencha os dados e mantenha seu histórico sincronizado no banco local."
+      title={isEditing ? 'Editar transação' : 'Nova transação'}
     >
       <FormField
         error={errors.title}
-        label="Titulo"
+        label="Título"
         onChangeText={(title) => setField('title', title)}
         placeholder="Ex.: Mercado da semana"
         value={values.title}

@@ -1,4 +1,5 @@
 import { Transaction, TransactionType } from '../database';
+import { createMonthDate, getLocalMonthKey } from '../utils/date';
 
 export interface MonthlyComparisonItem {
   monthDate: Date;
@@ -12,14 +13,6 @@ export interface CalculateMonthlyComparisonInput {
   transactions: Transaction[];
   referenceDate?: Date;
   monthsCount?: number;
-}
-
-function createMonthDate(year: number, month: number): Date {
-  return new Date(Date.UTC(year, month, 1));
-}
-
-function getMonthKey(date: Date): string {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function getMonthLabel(date: Date): string {
@@ -36,8 +29,8 @@ function getMonthWindow(referenceDate: Date, monthsCount: number): Date[] {
   for (let index = monthsCount - 1; index >= 0; index -= 1) {
     months.push(
       createMonthDate(
-        referenceDate.getUTCFullYear(),
-        referenceDate.getUTCMonth() - index,
+        referenceDate.getFullYear(),
+        referenceDate.getMonth() - index,
       ),
     );
   }
@@ -53,13 +46,13 @@ export function calculateMonthlyComparison(
   const months = getMonthWindow(referenceDate, monthsCount);
 
   return months.map((monthDate) => {
-    const monthKey = getMonthKey(monthDate);
+    const monthKey = getLocalMonthKey(monthDate);
 
     const totals = input.transactions.reduce(
       (accumulator, transaction) => {
         const transactionDate = new Date(transaction.transaction_date);
 
-        if (getMonthKey(transactionDate) !== monthKey) {
+        if (getLocalMonthKey(transactionDate) !== monthKey) {
           return accumulator;
         }
 
@@ -85,4 +78,3 @@ export function calculateMonthlyComparison(
     };
   });
 }
-

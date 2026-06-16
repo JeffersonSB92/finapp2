@@ -1,12 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { AppButton, AppCard } from '../components';
 import { FormField } from '../components/form';
 import { useAuthStore } from '../store/authStore';
 import { theme } from '../theme/theme';
@@ -34,10 +29,10 @@ export function AuthScreen(): React.JSX.Element {
 
   const helperText = useMemo(() => {
     if (mode === 'sign-in') {
-      return 'Entre com email e senha para sincronizar seus dados com isolamento por usuario.';
+      return 'Entre com e-mail e senha para sincronizar seus dados com isolamento por usuário.';
     }
 
-    return 'Crie uma conta para ativar sincronizacao segura entre dispositivos.';
+    return 'Crie uma conta para ativar sincronização segura entre dispositivos.';
   }, [mode]);
 
   async function handleSubmit(): Promise<void> {
@@ -67,7 +62,7 @@ export function AuthScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
+      <AppCard style={styles.card}>
         <Text style={styles.eyebrow}>Supabase Auth</Text>
         <Text style={styles.title}>{getTitle(mode)}</Text>
         <Text style={styles.subtitle}>{helperText}</Text>
@@ -96,35 +91,30 @@ export function AuthScreen(): React.JSX.Element {
         {localError ? <Text style={styles.error}>{localError}</Text> : null}
         {!localError && storeError ? <Text style={styles.error}>{storeError}</Text> : null}
 
-        <Pressable
-          disabled={isLoading}
+        <AppButton
+          label={getActionLabel(mode)}
+          loading={isLoading}
           onPress={() => {
             void handleSubmit();
           }}
-          style={[styles.primaryButton, isLoading ? styles.buttonDisabled : null]}
-        >
-          {isLoading ? (
-            <ActivityIndicator color={theme.colors.brand.white} />
-          ) : (
-            <Text style={styles.primaryButtonText}>{getActionLabel(mode)}</Text>
-          )}
-        </Pressable>
+        />
 
-        <Pressable
+        <AppButton
           disabled={isLoading}
+          label={
+            mode === 'sign-in'
+              ? 'Não tem conta? Criar agora'
+              : 'Já tem conta? Fazer login'
+          }
           onPress={() => {
             setLocalError(null);
             setMode((current) => (current === 'sign-in' ? 'sign-up' : 'sign-in'));
           }}
+          size="sm"
           style={styles.secondaryAction}
-        >
-          <Text style={styles.secondaryActionText}>
-            {mode === 'sign-in'
-              ? 'Nao tem conta? Criar agora'
-              : 'Ja tem conta? Fazer login'}
-          </Text>
-        </Pressable>
-      </View>
+          variant="ghost"
+        />
+      </AppCard>
     </View>
   );
 }
@@ -138,14 +128,8 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
   },
   card: {
-    ...theme.shadows.card,
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
     gap: theme.spacing.md,
     maxWidth: 440,
-    padding: theme.spacing.xl,
     width: '100%',
   },
   eyebrow: {
@@ -176,31 +160,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
   },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.brand.primary,
-    borderRadius: theme.radii.pill,
-    justifyContent: 'center',
-    minHeight: 52,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: theme.colors.brand.white,
-    fontFamily: theme.fonts.family.bold,
-    fontSize: theme.fonts.size.md,
-    lineHeight: theme.fonts.lineHeight.md,
-  },
   secondaryAction: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-  },
-  secondaryActionText: {
-    color: theme.colors.text.secondary,
-    fontFamily: theme.fonts.family.medium,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
+    alignSelf: 'center',
   },
 });

@@ -1,8 +1,9 @@
 import { Account, Transaction, TransactionType } from '../database';
+import { isSameLocalMonth } from '../utils/date';
 
-export interface PayableTransaction extends Transaction {
+export type PayableTransaction = Omit<Transaction, 'is_paid'> & {
   is_paid?: boolean;
-}
+};
 
 export interface FinanceSummary {
   saldoAtual: number;
@@ -15,15 +16,6 @@ export interface CalculateFinanceSummaryInput {
   accounts: Account[];
   transactions: PayableTransaction[];
   referenceDate?: Date;
-}
-
-function isSameMonth(dateIso: string, referenceDate: Date): boolean {
-  const date = new Date(dateIso);
-
-  return (
-    date.getUTCFullYear() === referenceDate.getUTCFullYear() &&
-    date.getUTCMonth() === referenceDate.getUTCMonth()
-  );
 }
 
 function isPaidExpense(transaction: PayableTransaction): boolean {
@@ -39,7 +31,7 @@ export function calculateFinanceSummary(
 ): FinanceSummary {
   const referenceDate = input.referenceDate ?? new Date();
   const monthTransactions = input.transactions.filter((transaction) =>
-    isSameMonth(transaction.transaction_date, referenceDate),
+    isSameLocalMonth(transaction.transaction_date, referenceDate),
   );
 
   const saldoEmConta = input.accounts.reduce((total, account) => {
@@ -66,11 +58,12 @@ export function calculateFinanceSummary(
     return total + transaction.amount;
   }, 0);
 
+  const saldoAtual = saldoEmConta + totalReceitas - totalDespesas;
+
   return {
-    saldoAtual: totalReceitas - totalDespesas,
+    saldoAtual,
     saldoEmConta,
     totalDespesas,
     totalReceitas,
   };
 }
-

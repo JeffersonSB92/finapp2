@@ -26,14 +26,38 @@ function getValueColor(type: TransactionListItemModel['type']): string {
 function getStatusStyles(status: TransactionListItemModel['status']) {
   if (status === 'paid') {
     return {
-      backgroundColor: 'rgba(46, 139, 87, 0.14)',
+      backgroundColor: theme.colors.status.successSoft,
       color: theme.colors.status.success,
     };
   }
 
   return {
-    backgroundColor: 'rgba(217, 80, 50, 0.16)',
+    backgroundColor: theme.colors.brand.primarySoft,
     color: theme.colors.brand.primary,
+  };
+}
+
+function getIndicator(type: TransactionListItemModel['type']): {
+  color: string;
+  label: string;
+} {
+  if (type === 'income') {
+    return {
+      color: theme.colors.status.success,
+      label: 'R',
+    };
+  }
+
+  if (type === 'expense') {
+    return {
+      color: theme.colors.brand.primary,
+      label: 'D',
+    };
+  }
+
+  return {
+    color: theme.colors.text.muted,
+    label: 'T',
   };
 }
 
@@ -43,6 +67,7 @@ export function TransactionItem({
   onEdit,
 }: TransactionItemProps): React.JSX.Element {
   const statusStyles = getStatusStyles(item.status);
+  const indicator = getIndicator(item.type);
 
   const renderRightActions = () => (
     <View style={styles.actions}>
@@ -65,12 +90,34 @@ export function TransactionItem({
     <Swipeable overshootRight={false} renderRightActions={renderRightActions}>
       <Pressable style={styles.container}>
         <View style={styles.content}>
+          <View
+            style={[
+              styles.indicator,
+              { backgroundColor: indicator.color },
+            ]}
+          >
+            <Text style={styles.indicatorText}>{indicator.label}</Text>
+          </View>
+
           <View style={styles.leading}>
-            <Text style={styles.title}>{item.title}</Text>
+            <Text numberOfLines={1} style={styles.title}>
+              {item.title}
+            </Text>
+
             <View style={styles.metaRow}>
-              <Text style={styles.category}>{item.category}</Text>
+              <Text numberOfLines={1} style={styles.metaText}>
+                {item.category}
+              </Text>
+              {item.account ? (
+                <>
+                  <Text style={styles.separator}>•</Text>
+                  <Text numberOfLines={1} style={styles.metaText}>
+                    {item.account}
+                  </Text>
+                </>
+              ) : null}
               <Text style={styles.separator}>•</Text>
-              <Text style={styles.date}>{item.dateLabel}</Text>
+              <Text style={styles.metaText}>{item.dateLabel}</Text>
             </View>
           </View>
 
@@ -94,8 +141,8 @@ export function TransactionItem({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.background.surface,
+    borderColor: theme.colors.border.soft,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
     marginBottom: theme.spacing.sm,
@@ -104,15 +151,28 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 88,
+    gap: theme.spacing.md,
+    minHeight: 82,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
+  },
+  indicator: {
+    alignItems: 'center',
+    borderRadius: theme.radii.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  indicatorText: {
+    color: theme.colors.brand.white,
+    fontFamily: theme.fonts.family.bold,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
   },
   leading: {
     flex: 1,
     gap: theme.spacing.xs,
-    paddingRight: theme.spacing.md,
+    minWidth: 0,
   },
   title: {
     color: theme.colors.text.primary,
@@ -126,7 +186,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: theme.spacing.xs,
   },
-  category: {
+  metaText: {
     color: theme.colors.text.secondary,
     fontFamily: theme.fonts.family.regular,
     fontSize: theme.fonts.size.sm,
@@ -135,15 +195,10 @@ const styles = StyleSheet.create({
   separator: {
     color: theme.colors.text.muted,
   },
-  date: {
-    color: theme.colors.text.muted,
-    fontFamily: theme.fonts.family.regular,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
-  },
   trailing: {
     alignItems: 'flex-end',
     gap: theme.spacing.xs,
+    marginLeft: theme.spacing.sm,
   },
   value: {
     fontFamily: theme.fonts.family.bold,
@@ -184,4 +239,3 @@ const styles = StyleSheet.create({
     lineHeight: theme.fonts.lineHeight.sm,
   },
 });
-

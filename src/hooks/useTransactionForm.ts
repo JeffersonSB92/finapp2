@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { TransactionType } from '../database';
 import { useFinanceStore } from '../store';
+import {
+  formatDateInput,
+  formatIsoDateInput,
+  parseDateInputToIso,
+} from '../utils/date';
 
 export type TransactionStatusValue = 'paid' | 'pending';
 
@@ -70,12 +75,8 @@ const typeOptions: Array<{ label: string; value: TransactionType }> = [
   { label: 'Despesa', value: TransactionType.EXPENSE },
 ];
 
-function formatInputDate(dateIso: string): string {
-  return dateIso.slice(0, 10);
-}
-
 function getTodayDateInput(): string {
-  return new Date().toISOString().slice(0, 10);
+  return formatDateInput(new Date());
 }
 
 function parseCurrencyInput(value: string): number {
@@ -105,7 +106,7 @@ function validate(values: TransactionFormValues): TransactionFormErrors {
   const errors: TransactionFormErrors = {};
 
   if (!values.title.trim()) {
-    errors.title = 'Informe um titulo para a transacao.';
+    errors.title = 'Informe um título para a transação.';
   }
 
   if (parseCurrencyInput(values.amount) <= 0) {
@@ -125,7 +126,7 @@ function validate(values: TransactionFormValues): TransactionFormErrors {
   }
 
   if (!isValidDateInput(values.date)) {
-    errors.date = 'Informe uma data valida no formato AAAA-MM-DD.';
+    errors.date = 'Informe uma data válida no formato AAAA-MM-DD.';
   }
 
   if (!values.status) {
@@ -184,7 +185,7 @@ export function useTransactionForm({
       categoryId: transaction.category_id,
       subcategoryId: transaction.subcategory_id,
       accountId: transaction.account_id,
-      date: formatInputDate(transaction.transaction_date),
+      date: formatIsoDateInput(transaction.transaction_date),
       status: transaction.is_paid ? 'paid' : 'pending',
     });
   }, [transactionId, transactions]);
@@ -241,7 +242,7 @@ export function useTransactionForm({
         description: values.title.trim(),
         notes: null,
         is_paid: values.status === 'paid',
-        transaction_date: new Date(`${values.date}T12:00:00.000Z`).toISOString(),
+        transaction_date: parseDateInputToIso(values.date),
       };
 
       if (transactionId) {

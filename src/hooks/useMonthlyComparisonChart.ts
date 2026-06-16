@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { calculateMonthlyComparison } from '../domain';
 import { useFinanceStore } from '../store';
+import { getCurrentMonthDate, shiftMonth } from '../utils/date';
 
 export interface MonthlyComparisonBar {
   monthKey: string;
@@ -40,13 +41,9 @@ function formatMonthLabel(date: Date): string {
   }).format(date);
 }
 
-function shiftMonth(date: Date, amount: number): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + amount, 1));
-}
-
 export function useMonthlyComparisonChart(): UseMonthlyComparisonChartResult {
   const [referenceDate, setReferenceDate] = useState<Date>(
-    new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), 1)),
+    getCurrentMonthDate(),
   );
 
   const transactions = useFinanceStore((state) => state.transactions);
@@ -100,4 +97,3 @@ export function useMonthlyComparisonChart(): UseMonthlyComparisonChartResult {
     },
   };
 }
-

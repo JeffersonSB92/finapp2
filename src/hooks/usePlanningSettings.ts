@@ -139,7 +139,7 @@ export function usePlanningSettings(): UsePlanningSettingsResult {
       },
       {
         id: 'nonEssential',
-        label: 'Nao essencial',
+        label: 'Não essencial',
         value: toNumber(values.nonEssential),
         color: '#B7422B',
       },
@@ -202,4 +202,3 @@ export function usePlanningSettings(): UsePlanningSettingsResult {
     submit,
   };
 }
-

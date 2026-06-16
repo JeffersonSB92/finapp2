@@ -5,12 +5,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
 import { TransactionType } from '../database';
 import { useCategoryManager } from '../hooks/useCategoryManager';
 import { theme } from '../theme/theme';
+import { AppButton, AppCard, EmptyState } from './ui';
 
 interface CategoryManagerProps {
   onAddCategory?: () => void;
@@ -37,7 +39,9 @@ export function CategoryManager({
   onAddSubcategory,
   onEditSubcategory,
 }: CategoryManagerProps): React.JSX.Element {
+  const { width } = useWindowDimensions();
   const { categories, error, isLoading, toggleCategory } = useCategoryManager();
+  const isCompactLayout = width < 420;
 
   return (
     <View style={styles.container}>
@@ -50,43 +54,49 @@ export function CategoryManager({
             <Text style={styles.eyebrow}>Categorias</Text>
             <Text style={styles.title}>Categorias e subcategorias</Text>
             <Text style={styles.subtitle}>
-              Organize seus lancamentos com uma estrutura clara e expansivel.
+              Organize seus lançamentos com uma estrutura clara, compacta e fácil de expandir.
             </Text>
           </View>
 
-          <Pressable onPress={onAddCategory} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>+ Nova categoria</Text>
-          </Pressable>
+          <AppButton
+            label="+ Nova categoria"
+            onPress={onAddCategory}
+            size="sm"
+            style={styles.primaryButton}
+          />
         </View>
 
         {isLoading ? (
-          <View style={styles.feedbackCard}>
+          <AppCard style={styles.feedbackCard}>
             <ActivityIndicator color={theme.colors.brand.primary} />
             <Text style={styles.feedbackText}>Carregando categorias...</Text>
-          </View>
+          </AppCard>
         ) : null}
 
         {error && !isLoading ? (
-          <View style={styles.feedbackCard}>
+          <AppCard style={styles.feedbackCard}>
             <Text style={styles.errorText}>{error}</Text>
-          </View>
+          </AppCard>
         ) : null}
 
         {!isLoading && !error ? (
           <View style={styles.list}>
             {categories.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Nenhuma categoria cadastrada</Text>
-                <Text style={styles.emptyText}>
-                  Crie categorias para organizar receitas, despesas e seus agrupamentos.
-                </Text>
-              </View>
+              <EmptyState
+                actionLabel="Nova categoria"
+                description="Crie categorias para organizar receitas, despesas e os agrupamentos do seu planejamento."
+                eyebrow="Sem categorias"
+                icon="grid"
+                onActionPress={onAddCategory}
+                style={styles.emptyCard}
+                title="Nenhuma categoria cadastrada"
+              />
             ) : (
               categories.map((category) => (
-                <View key={category.id} style={styles.categoryCard}>
+                <AppCard key={category.id} style={styles.categoryCard}>
                   <Pressable
                     onPress={() => toggleCategory(category.id)}
-                    style={styles.categoryHeader}
+                    style={[styles.categoryHeader, isCompactLayout ? styles.categoryHeaderCompact : null]}
                   >
                     <View style={styles.categoryLeading}>
                       <View
@@ -99,7 +109,9 @@ export function CategoryManager({
                       </View>
 
                       <View style={styles.categoryInfo}>
-                        <Text style={styles.categoryName}>{category.name}</Text>
+                        <Text numberOfLines={1} style={styles.categoryName}>
+                          {category.name}
+                        </Text>
                         <Text
                           style={[
                             styles.categoryType,
@@ -112,29 +124,36 @@ export function CategoryManager({
                     </View>
 
                     <View style={styles.categoryActions}>
-                      <Pressable
+                      <AppButton
+                        label="Editar"
                         onPress={() => onEditCategory?.(category.id)}
-                        style={styles.secondaryButton}
-                      >
-                        <Text style={styles.secondaryButtonText}>Editar</Text>
-                      </Pressable>
+                        size="sm"
+                        variant="secondary"
+                      />
 
-                      <Text style={styles.expandIcon}>
-                        {category.isExpanded ? '-' : '+'}
-                      </Text>
+                      <View style={styles.expandBadge}>
+                        <Text style={styles.expandIcon}>
+                          {category.isExpanded ? '-' : '+'}
+                        </Text>
+                      </View>
                     </View>
                   </Pressable>
 
                   {category.isExpanded ? (
                     <View style={styles.subcategoryArea}>
-                      <View style={styles.subcategoryHeader}>
+                      <View
+                        style={[
+                          styles.subcategoryHeader,
+                          isCompactLayout ? styles.subcategoryHeaderCompact : null,
+                        ]}
+                      >
                         <Text style={styles.subcategoryTitle}>Subcategorias</Text>
-                        <Pressable
+                        <AppButton
+                          label="+ Adicionar"
                           onPress={() => onAddSubcategory?.(category.id)}
-                          style={styles.inlineAction}
-                        >
-                          <Text style={styles.inlineActionText}>+ Adicionar</Text>
-                        </Pressable>
+                          size="sm"
+                          variant="ghost"
+                        />
                       </View>
 
                       {category.subcategories.length === 0 ? (
@@ -157,7 +176,7 @@ export function CategoryManager({
                                     : null,
                                 ]}
                               />
-                              <Text style={styles.subcategoryName}>
+                              <Text numberOfLines={1} style={styles.subcategoryName}>
                                 {subcategory.name}
                               </Text>
                             </View>
@@ -168,7 +187,7 @@ export function CategoryManager({
                       )}
                     </View>
                   ) : null}
-                </View>
+                </AppCard>
               ))
             )}
           </View>
@@ -186,7 +205,7 @@ const styles = StyleSheet.create({
   content: {
     gap: theme.spacing.lg,
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing['3xl'],
+    paddingBottom: theme.spacing.bottomSafe + theme.spacing['3xl'],
   },
   header: {
     gap: theme.spacing.md,
@@ -210,33 +229,15 @@ const styles = StyleSheet.create({
   subtitle: {
     color: theme.colors.text.secondary,
     fontFamily: theme.fonts.family.regular,
-    fontSize: theme.fonts.size.md,
-    lineHeight: theme.fonts.lineHeight.md,
-  },
-  primaryButton: {
-    ...theme.shadows.card,
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.brand.primary,
-    borderRadius: theme.radii.pill,
-    justifyContent: 'center',
-    minHeight: 48,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  primaryButtonText: {
-    color: theme.colors.brand.white,
-    fontFamily: theme.fonts.family.bold,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
   },
+  primaryButton: {
+    alignSelf: 'flex-start',
+  },
   feedbackCard: {
     alignItems: 'center',
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
     gap: theme.spacing.sm,
-    padding: theme.spacing.lg,
   },
   feedbackText: {
     color: theme.colors.text.secondary,
@@ -254,56 +255,36 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   emptyCard: {
-    ...theme.shadows.card,
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    gap: theme.spacing.xs,
-    padding: theme.spacing.lg,
-  },
-  emptyTitle: {
-    color: theme.colors.text.primary,
-    fontFamily: theme.fonts.family.semibold,
-    fontSize: theme.fonts.size.md,
-    lineHeight: theme.fonts.lineHeight.md,
-  },
-  emptyText: {
-    color: theme.colors.text.secondary,
-    fontFamily: theme.fonts.family.regular,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
+    minHeight: 0,
   },
   categoryCard: {
-    ...theme.shadows.card,
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
+    gap: theme.spacing.md,
     overflow: 'hidden',
   },
   categoryHeader: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: theme.spacing.sm,
     justifyContent: 'space-between',
-    minHeight: 84,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
+  },
+  categoryHeaderCompact: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
   },
   categoryLeading: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
     gap: theme.spacing.md,
-    paddingRight: theme.spacing.sm,
+    minWidth: 0,
   },
   iconBadge: {
     alignItems: 'center',
-    backgroundColor: theme.colors.gray[800],
+    backgroundColor: theme.colors.background.surfaceSoft,
     borderRadius: theme.radii.lg,
-    height: 52,
+    height: 48,
     justifyContent: 'center',
-    width: 52,
+    width: 48,
   },
   iconBadgeText: {
     color: theme.colors.brand.white,
@@ -314,6 +295,7 @@ const styles = StyleSheet.create({
   categoryInfo: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
   },
   categoryName: {
     color: theme.colors.text.primary,
@@ -331,51 +313,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
   },
-  secondaryButton: {
-    backgroundColor: theme.colors.background.primary,
-    borderColor: theme.colors.border.default,
+  expandBadge: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.background.surfaceSoft,
+    borderColor: theme.colors.border.soft,
     borderRadius: theme.radii.pill,
     borderWidth: 1,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 8,
-  },
-  secondaryButtonText: {
-    color: theme.colors.text.secondary,
-    fontFamily: theme.fonts.family.semibold,
-    fontSize: theme.fonts.size.xs,
-    lineHeight: theme.fonts.lineHeight.xs,
-    textTransform: 'uppercase',
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   expandIcon: {
     color: theme.colors.text.primary,
     fontFamily: theme.fonts.family.bold,
     fontSize: theme.fonts.size.lg,
     lineHeight: theme.fonts.lineHeight.lg,
-    width: 20,
-    textAlign: 'center',
   },
   subcategoryArea: {
-    borderTopColor: theme.colors.border.subtle,
+    borderTopColor: theme.colors.border.soft,
     borderTopWidth: 1,
-    padding: theme.spacing.lg,
     gap: theme.spacing.sm,
+    paddingTop: theme.spacing.md,
   },
   subcategoryHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  subcategoryHeaderCompact: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: theme.spacing.xs,
+  },
   subcategoryTitle: {
     color: theme.colors.text.primary,
-    fontFamily: theme.fonts.family.semibold,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
-  },
-  inlineAction: {
-    paddingVertical: 4,
-  },
-  inlineActionText: {
-    color: theme.colors.brand.primary,
     fontFamily: theme.fonts.family.semibold,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
@@ -388,8 +359,10 @@ const styles = StyleSheet.create({
   },
   subcategoryItem: {
     alignItems: 'center',
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: theme.colors.background.surfaceSoft,
+    borderColor: theme.colors.border.soft,
     borderRadius: theme.radii.lg,
+    borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.md,
@@ -397,8 +370,10 @@ const styles = StyleSheet.create({
   },
   subcategoryLeft: {
     alignItems: 'center',
+    flex: 1,
     flexDirection: 'row',
     gap: theme.spacing.sm,
+    minWidth: 0,
   },
   subcategoryDot: {
     backgroundColor: theme.colors.gray[600],
@@ -408,6 +383,7 @@ const styles = StyleSheet.create({
   },
   subcategoryName: {
     color: theme.colors.text.secondary,
+    flex: 1,
     fontFamily: theme.fonts.family.medium,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
@@ -417,7 +393,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.family.semibold,
     fontSize: theme.fonts.size.xs,
     lineHeight: theme.fonts.lineHeight.xs,
+    marginLeft: theme.spacing.sm,
     textTransform: 'uppercase',
   },
 });
-

@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { calculateCategorySpending } from '../domain';
 import { useFinanceStore } from '../store';
 import { theme } from '../theme/theme';
+import { shiftMonth } from '../utils/date';
 
 type TrendDirection = 'up' | 'down' | 'stable';
 
@@ -55,15 +56,11 @@ function formatCurrency(value: number): string {
   return currencyFormatter.format(value);
 }
 
-function shiftMonth(date: Date, amount: number): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + amount, 1));
-}
-
 function getTrend(current: number, previous: number): CategoryBreakdownTrend {
   if (previous === 0 && current === 0) {
     return {
       direction: 'stable',
-      label: 'Sem variacao',
+      label: 'Sem variação',
       value: '0%',
     };
   }
@@ -81,14 +78,14 @@ function getTrend(current: number, previous: number): CategoryBreakdownTrend {
   if (Math.abs(difference) < 0.5) {
     return {
       direction: 'stable',
-      label: 'Estavel',
+      label: 'Estável',
       value: `${difference.toFixed(0)}%`,
     };
   }
 
   return {
     direction: difference > 0 ? 'up' : 'down',
-    label: difference > 0 ? 'Alta de gastos' : 'Reducao',
+    label: difference > 0 ? 'Alta de gastos' : 'Redução',
     value: `${difference > 0 ? '+' : ''}${difference.toFixed(0)}%`,
   };
 }
@@ -155,10 +152,9 @@ export function useCategoryBreakdown({
     totalCategories: currentBreakdown.length,
     highlightLabel: mainCategory
       ? `${mainCategory.categoryName} lidera com ${mainCategory.percentage.toFixed(0)}%`
-      : 'Nenhuma categoria com gasto neste mes',
+      : 'Nenhuma categoria com gasto neste mês',
     trend: getTrend(totalAmountNumber, previousTotalAmount),
     isLoading,
     error,
   };
 }
-

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Feather } from '@expo/vector-icons';
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   StatusBar,
   Text,
@@ -15,8 +15,11 @@ import {
 
 import {
   AccountManager,
+  AppButton,
+  BottomTabBar,
   CategoryManager,
   Dashboard,
+  FloatingActionMenu,
   GraphScreen,
   PlanningSettings,
   TransactionForm,
@@ -26,8 +29,10 @@ import {
   AccountFormScreen,
   AuthScreen,
   CategoryFormScreen,
+  SettingsScreen,
 } from './src/screens';
 import { useAuthStore } from './src/store/authStore';
+import { useFinanceStore } from './src/store';
 import { theme } from './src/theme/theme';
 
 type AppRoute =
@@ -39,54 +44,152 @@ type AppRoute =
   | 'account-form'
   | 'categories'
   | 'category-form'
-  | 'planning';
+  | 'planning'
+  | 'settings';
 
 interface TabOption {
   label: string;
-  route: Extract<
-    AppRoute,
-    'dashboard' | 'analytics' | 'transactions' | 'accounts' | 'categories' | 'planning'
-  >;
+  icon: React.ComponentProps<typeof Feather>['name'];
+  route: Extract<AppRoute, 'dashboard' | 'analytics' | 'planning' | 'accounts' | 'settings'>;
 }
 
 const tabOptions: TabOption[] = [
-  { label: 'Inicio', route: 'dashboard' },
-  { label: 'Analise', route: 'analytics' },
-  { label: 'Transacoes', route: 'transactions' },
-  { label: 'Contas', route: 'accounts' },
-  { label: 'Categorias', route: 'categories' },
-  { label: 'Plano', route: 'planning' },
+  { label: 'Início', icon: 'home', route: 'dashboard' },
+  { label: 'Análise', icon: 'bar-chart-2', route: 'analytics' },
+  { label: 'Plano', icon: 'sliders', route: 'planning' },
+  { label: 'Contas', icon: 'credit-card', route: 'accounts' },
+  { label: 'Mais', icon: 'more-horizontal', route: 'settings' },
+];
+
+const fabOptions: Array<{
+  label: string;
+  icon: React.ComponentProps<typeof Feather>['name'];
+  route: Extract<AppRoute, 'transactions' | 'accounts' | 'categories'>;
+}> = [
+  { label: 'Transações', icon: 'repeat', route: 'transactions' },
+  { label: 'Contas', icon: 'credit-card', route: 'accounts' },
+  { label: 'Categorias', icon: 'grid', route: 'categories' },
 ];
 
 function HeaderAction({
+  icon,
   label,
   onPress,
 }: {
+  icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   onPress: () => void;
 }): React.JSX.Element {
   return (
-    <Pressable onPress={onPress} style={styles.headerAction}>
-      <Text style={styles.headerActionText}>{label}</Text>
-    </Pressable>
+    <AppButton
+      iconLeft={<Feather color={theme.colors.text.secondary} name={icon} size={14} />}
+      label={label}
+      onPress={onPress}
+      size="sm"
+      variant="secondary"
+    />
   );
 }
 
 export default function App(): React.JSX.Element {
   const initializeAuth = useAuthStore((state) => state.initialize);
   const authSession = useAuthStore((state) => state.session);
+  const authProfile = useAuthStore((state) => state.profile);
   const isAuthLoading = useAuthStore((state) => state.isLoading);
-  const signOut = useAuthStore((state) => state.signOut);
+  const initializeFinance = useFinanceStore((state) => state.initialize);
+  const financeError = useFinanceStore((state) => state.error);
   const [route, setRoute] = useState<AppRoute>('dashboard');
   const [editingTransactionId, setEditingTransactionId] = useState<number | undefined>();
+  const [isFabOpen, setIsFabOpen] = useState(false);
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     void initializeAuth();
   }, [initializeAuth]);
 
+  useEffect(() => {
+    if (!authSession) {
+      setRoute('dashboard');
+      setEditingTransactionId(undefined);
+      setIsFabOpen(false);
+      return;
+    }
+
+    setRoute('dashboard');
+    setEditingTransactionId(undefined);
+    setIsFabOpen(false);
+    void initializeFinance();
+  }, [authSession, initializeFinance]);
+
+  useEffect(() => {
+    setIsFabOpen(false);
+  }, [route]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNow(new Date());
+    }, 60000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  const shouldShowFab = route === 'dashboard';
+  const activeTabRoute: TabOption['route'] = (() => {
+    if (route === 'analytics') {
+      return 'analytics';
+    }
+
+    if (route === 'planning') {
+      return 'planning';
+    }
+
+    if (route === 'accounts' || route === 'account-form') {
+      return 'accounts';
+    }
+
+    if (
+      route === 'settings' ||
+      route === 'categories' ||
+      route === 'category-form'
+    ) {
+      return 'settings';
+    }
+
+    return 'dashboard';
+  })();
+  const sessionLabel =
+    authProfile?.displayName.trim() ||
+    authProfile?.fullName.trim() ||
+    authSession?.user.email ||
+    'Conta ativa';
+  const greetingPrefix = (() => {
+    const hour = now.getHours();
+
+    if (hour < 12) {
+      return 'Bom dia';
+    }
+
+    if (hour < 18) {
+      return 'Boa tarde';
+    }
+
+    return 'Boa noite';
+  })();
+  const sessionGreeting = `${greetingPrefix}, ${sessionLabel}`;
+
   function renderContent(): React.JSX.Element {
     if (route === 'dashboard') {
-      return <Dashboard />;
+      return (
+        <Dashboard
+          onAddTransaction={() => {
+            setEditingTransactionId(undefined);
+            setRoute('transaction-form');
+          }}
+          onOpenTransactions={() => setRoute('transactions')}
+        />
+      );
     }
 
     if (route === 'analytics') {
@@ -112,7 +215,11 @@ export default function App(): React.JSX.Element {
       return (
         <View style={styles.formWrapper}>
           <View style={styles.formHeader}>
-            <HeaderAction label="Voltar" onPress={() => setRoute('transactions')} />
+            <HeaderAction
+              icon="chevron-left"
+              label="Voltar"
+              onPress={() => setRoute('transactions')}
+            />
           </View>
           <TransactionForm
             onSuccess={() => {
@@ -133,7 +240,11 @@ export default function App(): React.JSX.Element {
       return (
         <View style={styles.formWrapper}>
           <View style={styles.formHeader}>
-            <HeaderAction label="Voltar" onPress={() => setRoute('accounts')} />
+            <HeaderAction
+              icon="chevron-left"
+              label="Voltar"
+              onPress={() => setRoute('accounts')}
+            />
           </View>
           <AccountFormScreen />
         </View>
@@ -148,11 +259,19 @@ export default function App(): React.JSX.Element {
       return (
         <View style={styles.formWrapper}>
           <View style={styles.formHeader}>
-            <HeaderAction label="Voltar" onPress={() => setRoute('categories')} />
+            <HeaderAction
+              icon="chevron-left"
+              label="Voltar"
+              onPress={() => setRoute('categories')}
+            />
           </View>
           <CategoryFormScreen />
         </View>
       );
+    }
+
+    if (route === 'settings') {
+      return <SettingsScreen />;
     }
 
     return <PlanningSettings />;
@@ -170,48 +289,60 @@ export default function App(): React.JSX.Element {
           {isAuthLoading ? (
             <View style={styles.centeredState}>
               <ActivityIndicator color={theme.colors.brand.primary} />
-              <Text style={styles.centeredStateText}>Preparando sessao...</Text>
+              <Text style={styles.centeredStateText}>Preparando sessão...</Text>
             </View>
           ) : null}
 
           {!isAuthLoading && !authSession ? <AuthScreen /> : null}
 
           {!isAuthLoading && authSession ? (
-          <View style={styles.container}>
-            <View style={styles.sessionHeader}>
-              <Text style={styles.sessionEmail}>{authSession.user.email ?? 'Conta ativa'}</Text>
-              <HeaderAction
-                label="Sair"
-                onPress={() => {
-                  void signOut();
-                }}
-              />
-            </View>
-
-            <View style={styles.content}>{renderContent()}</View>
-
-            <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>
-              <View style={styles.tabBar}>
-                {tabOptions.map((tab) => {
-                  const isActive = route === tab.route;
-
-                  return (
-                    <Pressable
-                      key={tab.route}
-                      onPress={() => setRoute(tab.route)}
-                      style={[styles.tabItem, isActive ? styles.tabItemActive : null]}
-                    >
-                      <Text
-                        style={[styles.tabLabel, isActive ? styles.tabLabelActive : null]}
-                      >
-                        {tab.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+            <View style={styles.container}>
+              <View style={styles.sessionHeader}>
+                <View style={styles.sessionIdentity}>
+                  <View style={styles.sessionAvatar}>
+                    <Feather
+                      color={theme.colors.brand.white}
+                      name="user"
+                      size={16}
+                    />
+                  </View>
+                  <Text numberOfLines={1} style={styles.sessionEmail}>
+                    {sessionGreeting}
+                  </Text>
+                </View>
+                <HeaderAction
+                  icon="settings"
+                  label="Mais"
+                  onPress={() => setRoute('settings')}
+                />
               </View>
-            </SafeAreaView>
-          </View>
+
+              {financeError ? (
+                <View style={styles.sessionErrorContainer}>
+                  <Text style={styles.sessionErrorText}>{financeError}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.content}>{renderContent()}</View>
+
+              {shouldShowFab ? (
+                <FloatingActionMenu
+                  currentRoute={route}
+                  isOpen={isFabOpen}
+                  onPrimaryPress={() => setIsFabOpen((current) => !current)}
+                  options={fabOptions}
+                  onSelectRoute={(nextRoute) => setRoute(nextRoute)}
+                />
+              ) : null}
+
+              <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>
+                <BottomTabBar
+                  activeRoute={activeTabRoute}
+                  items={tabOptions}
+                  onSelect={(nextRoute) => setRoute(nextRoute)}
+                />
+              </SafeAreaView>
+            </View>
           ) : null}
         </SafeAreaView>
       </GestureHandlerRootView>
@@ -252,16 +383,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    minHeight: 60,
     paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.sm,
+    paddingTop: theme.spacing.xs,
+  },
+  sessionIdentity: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    minWidth: 0,
+  },
+  sessionAvatar: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.brand.primarySoft,
+    borderColor: theme.colors.brand.primary,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
   sessionEmail: {
-    color: theme.colors.text.muted,
+    color: theme.colors.text.secondary,
     flex: 1,
     fontFamily: theme.fonts.family.medium,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
     paddingRight: theme.spacing.md,
+  },
+  sessionErrorContainer: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+  },
+  sessionErrorText: {
+    color: theme.colors.status.error,
+    fontFamily: theme.fonts.family.medium,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
   },
   formWrapper: {
     backgroundColor: theme.colors.background.primary,
@@ -271,54 +430,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.md,
   },
-  headerAction: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  headerActionText: {
-    color: theme.colors.text.secondary,
-    fontFamily: theme.fonts.family.semibold,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
-  },
   tabBarSafeArea: {
-    backgroundColor: theme.colors.background.secondary,
-  },
-  tabBar: {
-    backgroundColor: theme.colors.background.secondary,
-    borderTopColor: theme.colors.border.default,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.sm,
-    paddingTop: theme.spacing.sm,
-    paddingBottom: theme.spacing.sm,
-  },
-  tabItem: {
-    alignItems: 'center',
-    borderRadius: theme.radii.pill,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: theme.spacing.xs,
-  },
-  tabItemActive: {
-    backgroundColor: 'rgba(217, 80, 50, 0.14)',
-  },
-  tabLabel: {
-    color: theme.colors.text.muted,
-    fontFamily: theme.fonts.family.medium,
-    fontSize: theme.fonts.size.xs,
-    lineHeight: theme.fonts.lineHeight.xs,
-    textAlign: 'center',
-  },
-  tabLabelActive: {
-    color: theme.colors.brand.primary,
-    fontFamily: theme.fonts.family.bold,
+    backgroundColor: theme.colors.background.primary,
   },
 });

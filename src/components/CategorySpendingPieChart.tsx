@@ -31,7 +31,7 @@ export function CategorySpendingPieChart(): React.JSX.Element {
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.eyebrow}>Distribuicao</Text>
+          <Text style={styles.eyebrow}>Distribuição</Text>
           <Text style={styles.title}>Gastos por categoria</Text>
         </View>
 
@@ -47,7 +47,7 @@ export function CategorySpendingPieChart(): React.JSX.Element {
       </View>
 
       <View style={styles.card}>
-        {isLoading ? <Text style={styles.feedbackText}>Carregando grafico...</Text> : null}
+        {isLoading ? <Text style={styles.feedbackText}>Carregando gráfico...</Text> : null}
         {error && !isLoading ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {!isLoading && !error ? (
@@ -98,7 +98,7 @@ export function CategorySpendingPieChart(): React.JSX.Element {
 
             <View style={styles.legend}>
               {slices.length === 0 ? (
-                <Text style={styles.emptyText}>Nenhum gasto encontrado neste mes.</Text>
+                <Text style={styles.emptyText}>Nenhum gasto encontrado neste mês.</Text>
               ) : (
                 slices.map((slice) => (
                   <View key={slice.id} style={styles.legendItem}>
@@ -270,4 +270,3 @@ const styles = StyleSheet.create({
     lineHeight: theme.fonts.lineHeight.md,
   },
 });
-

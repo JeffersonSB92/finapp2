@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { calculateCategorySpending } from '../domain';
 import { useFinanceStore } from '../store';
 import { theme } from '../theme/theme';
+import { getCurrentMonthDate, shiftMonth } from '../utils/date';
 
 export interface CategorySpendingSlice {
   id: string;
@@ -42,10 +43,6 @@ function formatCurrency(value: number): string {
   return currencyFormatter.format(value);
 }
 
-function shiftMonth(date: Date, amount: number): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + amount, 1));
-}
-
 function formatMonthLabel(date: Date): string {
   return new Intl.DateTimeFormat('pt-BR', {
     month: 'long',
@@ -55,7 +52,7 @@ function formatMonthLabel(date: Date): string {
 
 export function useCategorySpendingPieChart(): UseCategorySpendingPieChartResult {
   const [referenceDate, setReferenceDate] = useState<Date>(
-    new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), 1)),
+    getCurrentMonthDate(),
   );
 
   const categories = useFinanceStore((state) => state.categories);
@@ -106,4 +103,3 @@ export function useCategorySpendingPieChart(): UseCategorySpendingPieChartResult
     },
   };
 }
-

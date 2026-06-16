@@ -23,8 +23,8 @@ interface AccountFormErrors {
 const accountTypeOptions: OptionItem<AccountType>[] = [
   { label: 'Carteira', value: AccountType.CASH },
   { label: 'Corrente', value: AccountType.CHECKING },
-  { label: 'Poupanca', value: AccountType.SAVINGS },
-  { label: 'Cartao', value: AccountType.CREDIT_CARD },
+  { label: 'Poupança', value: AccountType.SAVINGS },
+  { label: 'Cartão', value: AccountType.CREDIT_CARD },
   { label: 'Investimento', value: AccountType.INVESTMENT },
   { label: 'Outro', value: AccountType.OTHER },
 ];
@@ -42,7 +42,7 @@ function validateAccount(values: AccountFormValues): AccountFormErrors {
   }
 
   if (Number.isNaN(balance)) {
-    errors.balance = 'Informe um saldo inicial valido.';
+    errors.balance = 'Informe um saldo inicial válido.';
   }
 
   if (!values.currency.trim() || values.currency.trim().length !== 3) {
@@ -164,7 +164,7 @@ export function AccountFormScreen(): React.JSX.Element {
 
       <FormField
         hint="Opcional"
-        label="Icone"
+        label="Ícone"
         onChangeText={(icon) => setValues((current) => ({ ...current, icon }))}
         placeholder="wallet"
         value={values.icon}
@@ -172,4 +172,3 @@ export function AccountFormScreen(): React.JSX.Element {
     </FormScreen>
   );
 }
-

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { Category, Transaction, TransactionType } from '../database';
+import { Account, Category, Transaction, TransactionType } from '../database';
 import { useFinanceStore } from '../store';
+import { getLocalDateKey, parseDateKey } from '../utils/date';
 
 export type TransactionPaymentStatus = 'paid' | 'pending';
 export type TransactionFilterType = 'all' | TransactionType;
@@ -11,6 +12,7 @@ export interface TransactionListItemModel {
   title: string;
   value: string;
   rawValue: number;
+  account: string | null;
   category: string;
   type: TransactionType;
   status: TransactionPaymentStatus;
@@ -70,6 +72,10 @@ function buildCategoryMap(categories: Category[]): Map<number, Category> {
   return new Map(categories.map((category) => [category.id, category]));
 }
 
+function buildAccountMap(accounts: Account[]): Map<number, Account> {
+  return new Map(accounts.map((account) => [account.id, account]));
+}
+
 function deriveStatus(transaction: Transaction): TransactionPaymentStatus {
   return transaction.is_paid ? 'paid' : 'pending';
 }
@@ -77,21 +83,24 @@ function deriveStatus(transaction: Transaction): TransactionPaymentStatus {
 function buildItemModel(
   transaction: Transaction,
   categoriesById: Map<number, Category>,
+  accountsById: Map<number, Account>,
 ): TransactionListItemModel {
   const category = transaction.category_id
     ? categoriesById.get(transaction.category_id)
     : null;
+  const account = accountsById.get(transaction.account_id);
   const status = deriveStatus(transaction);
   const transactionDate = new Date(transaction.transaction_date);
 
   return {
     id: transaction.id,
-    title: transaction.description?.trim() || 'Transacao sem titulo',
+    title: transaction.description?.trim() || 'Transação sem título',
     value: formatCurrency(transaction.amount),
     rawValue: transaction.amount,
+    account: account?.name ?? null,
     category:
       category?.name ??
-      (transaction.type === TransactionType.TRANSFER ? 'Transferencia' : 'Sem categoria'),
+      (transaction.type === TransactionType.TRANSFER ? 'Transferência' : 'Sem categoria'),
     type: transaction.type,
     status,
     statusLabel: status === 'paid' ? 'Pago' : 'Pendente',
@@ -104,6 +113,7 @@ export function useTransactionList(): UseTransactionListResult {
   const [typeFilter, setTypeFilter] = useState<TransactionFilterType>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
+  const accounts = useFinanceStore((state) => state.accounts);
   const transactions = useFinanceStore((state) => state.transactions);
   const categories = useFinanceStore((state) => state.categories);
   const initialize = useFinanceStore((state) => state.initialize);
@@ -130,6 +140,7 @@ export function useTransactionList(): UseTransactionListResult {
 
   const sections = useMemo<TransactionListSection[]>(() => {
     const categoriesById = buildCategoryMap(categories);
+    const accountsById = buildAccountMap(accounts);
 
     const filteredTransactions = transactions.filter((transaction) => {
       if (typeFilter !== 'all' && transaction.type !== typeFilter) {
@@ -148,10 +159,9 @@ export function useTransactionList(): UseTransactionListResult {
 
     const grouped = filteredTransactions.reduce<Map<string, TransactionListItemModel[]>>(
       (accumulator, transaction) => {
-        const date = new Date(transaction.transaction_date);
-        const dateKey = date.toISOString().slice(0, 10);
+        const dateKey = getLocalDateKey(transaction.transaction_date);
         const currentItems = accumulator.get(dateKey) ?? [];
-        currentItems.push(buildItemModel(transaction, categoriesById));
+        currentItems.push(buildItemModel(transaction, categoriesById, accountsById));
         accumulator.set(dateKey, currentItems);
         return accumulator;
       },
@@ -161,11 +171,11 @@ export function useTransactionList(): UseTransactionListResult {
     return Array.from(grouped.entries())
       .sort(([left], [right]) => right.localeCompare(left))
       .map(([dateKey, data]) => ({
-        title: formatSectionTitle(new Date(`${dateKey}T00:00:00.000Z`)),
+        title: formatSectionTitle(parseDateKey(dateKey)),
         dateKey,
         data,
       }));
-  }, [categories, categoryFilter, transactions, typeFilter]);
+  }, [accounts, categories, categoryFilter, transactions, typeFilter]);
 
   return {
     sections,

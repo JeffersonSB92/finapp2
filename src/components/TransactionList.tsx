@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   SectionList,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   View,
 } from 'react-native';
 
+import { TransactionType } from '../database';
 import {
   TransactionCategoryFilter,
   TransactionFilterType,
@@ -16,6 +16,7 @@ import {
 } from '../hooks/useTransactionList';
 import { theme } from '../theme/theme';
 import { TransactionItem } from './TransactionItem';
+import { AppButton, AppCard, AppPill, EmptyState } from './ui';
 
 interface TransactionListProps {
   onAddTransaction?: () => void;
@@ -24,35 +25,9 @@ interface TransactionListProps {
 
 const typeOptions: Array<{ label: string; value: TransactionFilterType }> = [
   { label: 'Todas', value: 'all' },
-  { label: 'Receitas', value: 'income' },
-  { label: 'Despesas', value: 'expense' },
+  { label: 'Receitas', value: TransactionType.INCOME },
+  { label: 'Despesas', value: TransactionType.EXPENSE },
 ];
-
-function FilterChip({
-  label,
-  onPress,
-  selected,
-}: {
-  label: string;
-  onPress: () => void;
-  selected: boolean;
-}): React.JSX.Element {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.filterChip, selected ? styles.filterChipSelected : null]}
-    >
-      <Text
-        style={[
-          styles.filterChipText,
-          selected ? styles.filterChipTextSelected : null,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 function CategoryFilters({
   categoryFilter,
@@ -67,7 +42,7 @@ function CategoryFilters({
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
       <View style={styles.filterRow}>
         {categoryOptions.map((option) => (
-          <FilterChip
+          <AppPill
             key={option.value}
             label={option.label}
             onPress={() => setCategoryFilter(option.value)}
@@ -98,42 +73,51 @@ export function TransactionList({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>Transacoes</Text>
-        <Text style={styles.title}>Movimentacoes recentes</Text>
+        <Text style={styles.eyebrow}>Movimentações</Text>
+        <Text style={styles.title}>Todas as transações</Text>
+        <Text style={styles.subtitle}>
+          Filtre por tipo e categoria para localizar suas movimentações com rapidez.
+        </Text>
       </View>
 
-      <View style={styles.filtersCard}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.filterRow}>
-            {typeOptions.map((option) => (
-              <FilterChip
-                key={option.value}
-                label={option.label}
-                onPress={() => setTypeFilter(option.value)}
-                selected={typeFilter === option.value}
-              />
-            ))}
-          </View>
-        </ScrollView>
+      <AppCard style={styles.filtersCard}>
+        <View style={styles.filterGroup}>
+          <Text style={styles.filterLabel}>Tipo</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.filterRow}>
+              {typeOptions.map((option) => (
+                <AppPill
+                  key={option.value}
+                  label={option.label}
+                  onPress={() => setTypeFilter(option.value)}
+                  selected={typeFilter === option.value}
+                />
+              ))}
+            </View>
+          </ScrollView>
+        </View>
 
-        <CategoryFilters
-          categoryFilter={categoryFilter}
-          categoryOptions={categoryOptions}
-          setCategoryFilter={setCategoryFilter}
-        />
-      </View>
+        <View style={styles.filterGroup}>
+          <Text style={styles.filterLabel}>Categoria</Text>
+          <CategoryFilters
+            categoryFilter={categoryFilter}
+            categoryOptions={categoryOptions}
+            setCategoryFilter={setCategoryFilter}
+          />
+        </View>
+      </AppCard>
 
       {isLoading ? (
-        <View style={styles.feedbackCard}>
+        <AppCard style={styles.feedbackCard}>
           <ActivityIndicator color={theme.colors.brand.primary} />
-          <Text style={styles.feedbackText}>Carregando transacoes...</Text>
-        </View>
+          <Text style={styles.feedbackText}>Carregando transações...</Text>
+        </AppCard>
       ) : null}
 
       {error && !isLoading ? (
-        <View style={styles.feedbackCard}>
+        <AppCard style={styles.feedbackCard}>
           <Text style={styles.errorText}>{error}</Text>
-        </View>
+        </AppCard>
       ) : null}
 
       {!isLoading && !error ? (
@@ -149,24 +133,32 @@ export function TransactionList({
             />
           )}
           renderSectionHeader={({ section }) => (
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+            </View>
           )}
           ListEmptyComponent={
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Nenhuma transacao encontrada</Text>
-              <Text style={styles.emptyText}>
-                Ajuste os filtros ou adicione uma nova movimentacao.
-              </Text>
-            </View>
+            <EmptyState
+              actionLabel="Nova movimentação"
+              description="Ajuste os filtros ou adicione uma nova movimentação para começar."
+              eyebrow="Sem transações"
+              icon="repeat"
+              onActionPress={onAddTransaction}
+              style={styles.emptyCard}
+              title="Nenhuma transação encontrada"
+            />
           }
           stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
         />
       ) : null}
 
-      <Pressable onPress={onAddTransaction} style={styles.fab}>
-        <Text style={styles.fabText}>+ Nova</Text>
-      </Pressable>
+      <AppButton
+        label="+ Nova"
+        onPress={onAddTransaction}
+        size="fab"
+        style={styles.fab}
+      />
     </View>
   );
 }
@@ -194,50 +186,34 @@ const styles = StyleSheet.create({
     fontSize: theme.fonts.size['2xl'],
     lineHeight: theme.fonts.lineHeight['2xl'],
   },
+  subtitle: {
+    color: theme.colors.text.secondary,
+    fontFamily: theme.fonts.family.regular,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
+  },
   filtersCard: {
-    ...theme.shadows.card,
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
     marginBottom: theme.spacing.md,
-    padding: theme.spacing.md,
+  },
+  filterGroup: {
+    gap: theme.spacing.xs,
+  },
+  filterLabel: {
+    color: theme.colors.text.muted,
+    fontFamily: theme.fonts.family.medium,
+    fontSize: theme.fonts.size.xs,
+    lineHeight: theme.fonts.lineHeight.xs,
+    textTransform: 'uppercase',
   },
   filterRow: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
     paddingRight: theme.spacing.md,
   },
-  filterChip: {
-    backgroundColor: theme.colors.background.primary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  filterChipSelected: {
-    backgroundColor: theme.colors.brand.primary,
-    borderColor: theme.colors.brand.primary,
-  },
-  filterChipText: {
-    color: theme.colors.text.secondary,
-    fontFamily: theme.fonts.family.medium,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
-  },
-  filterChipTextSelected: {
-    color: theme.colors.brand.white,
-  },
   feedbackCard: {
     alignItems: 'center',
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
     gap: theme.spacing.sm,
-    padding: theme.spacing.lg,
   },
   feedbackText: {
     color: theme.colors.text.secondary,
@@ -252,54 +228,25 @@ const styles = StyleSheet.create({
     lineHeight: theme.fonts.lineHeight.md,
   },
   listContent: {
-    paddingBottom: 104,
+    paddingBottom: theme.spacing.bottomSafe + theme.spacing['2xl'],
+  },
+  sectionHeader: {
+    paddingBottom: theme.spacing.xs,
+    paddingTop: theme.spacing.md,
   },
   sectionTitle: {
     color: theme.colors.text.secondary,
     fontFamily: theme.fonts.family.semibold,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
-    marginBottom: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
     textTransform: 'capitalize',
   },
   emptyCard: {
-    ...theme.shadows.card,
-    backgroundColor: theme.colors.background.secondary,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    gap: theme.spacing.xs,
-    padding: theme.spacing.lg,
-  },
-  emptyTitle: {
-    color: theme.colors.text.primary,
-    fontFamily: theme.fonts.family.semibold,
-    fontSize: theme.fonts.size.md,
-    lineHeight: theme.fonts.lineHeight.md,
-  },
-  emptyText: {
-    color: theme.colors.text.secondary,
-    fontFamily: theme.fonts.family.regular,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
+    marginTop: theme.spacing.sm,
   },
   fab: {
-    ...theme.shadows.card,
-    alignItems: 'center',
-    backgroundColor: theme.colors.brand.primary,
-    borderRadius: theme.radii.pill,
-    bottom: theme.spacing.lg,
-    justifyContent: 'center',
-    minHeight: 56,
-    paddingHorizontal: theme.spacing.xl,
+    bottom: theme.spacing.bottomSafe + theme.spacing.md,
     position: 'absolute',
     right: theme.spacing.lg,
-  },
-  fabText: {
-    color: theme.colors.brand.white,
-    fontFamily: theme.fonts.family.bold,
-    fontSize: theme.fonts.size.md,
-    lineHeight: theme.fonts.lineHeight.md,
   },
 });

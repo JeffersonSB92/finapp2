@@ -1,4 +1,5 @@
 import { Category, Transaction, TransactionType } from '../database';
+import { isSameLocalMonth } from '../utils/date';
 
 export interface CategorySpendingItem {
   categoryId: number | null;
@@ -13,15 +14,6 @@ export interface CalculateCategorySpendingInput {
   referenceDate?: Date;
 }
 
-function isSameMonth(dateIso: string, referenceDate: Date): boolean {
-  const date = new Date(dateIso);
-
-  return (
-    date.getUTCFullYear() === referenceDate.getUTCFullYear() &&
-    date.getUTCMonth() === referenceDate.getUTCMonth()
-  );
-}
-
 export function calculateCategorySpending(
   input: CalculateCategorySpendingInput,
 ): CategorySpendingItem[] {
@@ -29,7 +21,7 @@ export function calculateCategorySpending(
   const monthExpenses = input.transactions.filter(
     (transaction) =>
       transaction.type === TransactionType.EXPENSE &&
-      isSameMonth(transaction.transaction_date, referenceDate),
+      isSameLocalMonth(transaction.transaction_date, referenceDate),
   );
 
   const categoryTotals = monthExpenses.reduce<Map<number | null, number>>(
@@ -59,4 +51,3 @@ export function calculateCategorySpending(
     })
     .sort((left, right) => right.amount - left.amount);
 }
-
