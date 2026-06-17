@@ -78,6 +78,30 @@ export const CREATE_TABLES_STATEMENTS = `
     FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL
   );
 
+  CREATE TABLE IF NOT EXISTS recurring_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_id TEXT UNIQUE,
+    user_id TEXT,
+    account_id INTEGER,
+    person_id INTEGER,
+    category_id INTEGER,
+    subcategory_id INTEGER,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+    group_type TEXT NOT NULL CHECK (group_type IN ('fixed', 'variable')),
+    amount REAL NOT NULL,
+    day_of_month INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 31),
+    notes TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_synced_at TEXT,
+    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE SET NULL,
+    FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE SET NULL,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL
+  );
+
   CREATE TABLE IF NOT EXISTS people (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sync_id TEXT UNIQUE,
@@ -152,6 +176,9 @@ export const CREATE_INDEXES_STATEMENTS = `
   CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_sync_id
     ON transactions (sync_id);
 
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_recurring_entries_sync_id
+    ON recurring_entries (sync_id);
+
   CREATE UNIQUE INDEX IF NOT EXISTS idx_people_sync_id
     ON people (sync_id);
 
@@ -178,6 +205,9 @@ export const CREATE_INDEXES_STATEMENTS = `
 
   CREATE INDEX IF NOT EXISTS idx_transactions_user_id
     ON transactions (user_id);
+
+  CREATE INDEX IF NOT EXISTS idx_recurring_entries_user_id
+    ON recurring_entries (user_id);
 
   CREATE INDEX IF NOT EXISTS idx_planning_user_id
     ON planning (user_id);
@@ -208,6 +238,18 @@ export const CREATE_INDEXES_STATEMENTS = `
 
   CREATE INDEX IF NOT EXISTS idx_transactions_transaction_date
     ON transactions (transaction_date);
+
+  CREATE INDEX IF NOT EXISTS idx_recurring_entries_day_of_month
+    ON recurring_entries (day_of_month);
+
+  CREATE INDEX IF NOT EXISTS idx_recurring_entries_account_id
+    ON recurring_entries (account_id);
+
+  CREATE INDEX IF NOT EXISTS idx_recurring_entries_person_id
+    ON recurring_entries (person_id);
+
+  CREATE INDEX IF NOT EXISTS idx_recurring_entries_category_id
+    ON recurring_entries (category_id);
 
   CREATE INDEX IF NOT EXISTS idx_planning_period
     ON planning (year, month);

@@ -6,6 +6,7 @@ import {
   Planning,
   PlanningSettings,
   Person,
+  RecurringEntry,
   Subcategory,
   Transaction,
   initDatabase,
@@ -28,6 +29,14 @@ import type {
   UpdatePersonInput,
 } from '../database/repositories/PersonRepository';
 import type {
+  CreateRecurringEntryInput,
+  UpdateRecurringEntryInput,
+} from '../database/repositories/RecurringEntryRepository';
+import type {
+  CreateSubcategoryInput,
+  UpdateSubcategoryInput,
+} from '../database/repositories/SubcategoryRepository';
+import type {
   CreateTransactionInput,
   UpdateTransactionInput,
 } from '../database/repositories/TransactionRepository';
@@ -42,6 +51,7 @@ interface FinanceState {
   transactions: Transaction[];
   categories: Category[];
   subcategories: Subcategory[];
+  recurringEntries: RecurringEntry[];
   planning: Planning[];
   planningSettings: PlanningSettings | null;
   isLoading: boolean;
@@ -60,6 +70,7 @@ interface FinanceState {
   loadTransactions: () => Promise<void>;
   loadCategories: () => Promise<void>;
   loadSubcategories: () => Promise<void>;
+  loadRecurringEntries: () => Promise<void>;
   loadPlanning: () => Promise<void>;
   loadPlanningSettings: () => Promise<void>;
   addAccount: (input: CreateAccountInput) => Promise<Account>;
@@ -80,6 +91,18 @@ interface FinanceState {
     input: UpdateCategoryInput,
   ) => Promise<Category>;
   removeCategory: (id: number) => Promise<void>;
+  addSubcategory: (input: CreateSubcategoryInput) => Promise<Subcategory>;
+  updateSubcategory: (
+    id: number,
+    input: UpdateSubcategoryInput,
+  ) => Promise<Subcategory>;
+  removeSubcategory: (id: number) => Promise<void>;
+  addRecurringEntry: (input: CreateRecurringEntryInput) => Promise<RecurringEntry>;
+  updateRecurringEntry: (
+    id: number,
+    input: UpdateRecurringEntryInput,
+  ) => Promise<RecurringEntry>;
+  removeRecurringEntry: (id: number) => Promise<void>;
   addPlanning: (input: CreatePlanningInput) => Promise<Planning>;
   updatePlanning: (
     id: number,
@@ -101,6 +124,24 @@ function sortPeople(items: Person[]): Person[] {
 
 function sortCategories(items: Category[]): Category[] {
   return [...items].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function sortSubcategories(items: Subcategory[]): Subcategory[] {
+  return [...items].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function sortRecurringEntries(items: RecurringEntry[]): RecurringEntry[] {
+  return [...items].sort((left, right) => {
+    if (left.is_active !== right.is_active) {
+      return left.is_active ? -1 : 1;
+    }
+
+    if (left.day_of_month !== right.day_of_month) {
+      return left.day_of_month - right.day_of_month;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
 }
 
 function sortTransactions(items: Transaction[]): Transaction[] {
@@ -144,6 +185,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   transactions: [],
   categories: [],
   subcategories: [],
+  recurringEntries: [],
   planning: [],
   planningSettings: null,
   isLoading: false,
@@ -201,6 +243,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         transactions,
         categories,
         subcategories,
+        recurringEntries,
         planning,
         planningSettings,
       ] = await Promise.all([
@@ -209,6 +252,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         storeRepositories.transactionRepository.getAll(),
         storeRepositories.categoryRepository.getAll(),
         storeRepositories.subcategoryRepository.getAll(),
+        storeRepositories.recurringEntryRepository.getAll(),
         storeRepositories.planningRepository.getAll(),
         storeRepositories.planningSettingsRepository.getLatest(),
       ]);
@@ -218,7 +262,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         people: sortPeople(people),
         transactions: sortTransactions(transactions),
         categories: sortCategories(categories),
-        subcategories,
+        subcategories: sortSubcategories(subcategories),
+        recurringEntries: sortRecurringEntries(recurringEntries),
         planning: sortPlanning(planning),
         planningSettings,
         isLoading: false,
@@ -268,6 +313,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       transactions: [],
       categories: [],
       subcategories: [],
+      recurringEntries: [],
       planning: [],
       planningSettings: null,
       isLoading: false,
@@ -338,11 +384,27 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     try {
       await ensureDatabaseInitialized();
       const subcategories = await storeRepositories.subcategoryRepository.getAll();
-      set({ subcategories, error: null });
+      set({ subcategories: sortSubcategories(subcategories), error: null });
     } catch (error) {
       set({
         error:
           error instanceof Error ? error.message : 'Não foi possível carregar as subcategorias.',
+      });
+      throw error;
+    }
+  },
+
+  loadRecurringEntries: async () => {
+    try {
+      await ensureDatabaseInitialized();
+      const recurringEntries = await storeRepositories.recurringEntryRepository.getAll();
+      set({ recurringEntries: sortRecurringEntries(recurringEntries), error: null });
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível carregar os compromissos recorrentes.',
       });
       throw error;
     }
@@ -587,6 +649,117 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       set({
         error:
           error instanceof Error ? error.message : 'Não foi possível remover a categoria.',
+      });
+      throw error;
+    }
+  },
+
+  addSubcategory: async (input) => {
+    try {
+      await ensureDatabaseInitialized();
+      const subcategory = await storeRepositories.subcategoryRepository.create(input);
+      await syncService.queueUpsert('subcategories', subcategory.sync_id);
+      await get().reloadAll();
+      void get().syncNow();
+      return subcategory;
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : 'Não foi possível adicionar a subcategoria.',
+      });
+      throw error;
+    }
+  },
+
+  updateSubcategory: async (id, input) => {
+    try {
+      await ensureDatabaseInitialized();
+      const subcategory = await storeRepositories.subcategoryRepository.update(id, input);
+      await syncService.queueUpsert('subcategories', subcategory.sync_id);
+      await get().reloadAll();
+      void get().syncNow();
+      return subcategory;
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : 'Não foi possível atualizar a subcategoria.',
+      });
+      throw error;
+    }
+  },
+
+  removeSubcategory: async (id) => {
+    try {
+      await ensureDatabaseInitialized();
+      const subcategory = await storeRepositories.subcategoryRepository.getById(id);
+      await syncService.queueDelete('subcategories', subcategory);
+      await storeRepositories.subcategoryRepository.delete(id);
+      await get().reloadAll();
+      void get().syncNow();
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : 'Não foi possível remover a subcategoria.',
+      });
+      throw error;
+    }
+  },
+
+  addRecurringEntry: async (input) => {
+    try {
+      await ensureDatabaseInitialized();
+      const recurringEntry = await storeRepositories.recurringEntryRepository.create(input);
+      await syncService.queueUpsert('recurring_entries', recurringEntry.sync_id);
+      await get().reloadAll();
+      void get().syncNow();
+      return recurringEntry;
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível adicionar o compromisso recorrente.',
+      });
+      throw error;
+    }
+  },
+
+  updateRecurringEntry: async (id, input) => {
+    try {
+      await ensureDatabaseInitialized();
+      const recurringEntry = await storeRepositories.recurringEntryRepository.update(
+        id,
+        input,
+      );
+      await syncService.queueUpsert('recurring_entries', recurringEntry.sync_id);
+      await get().reloadAll();
+      void get().syncNow();
+      return recurringEntry;
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível atualizar o compromisso recorrente.',
+      });
+      throw error;
+    }
+  },
+
+  removeRecurringEntry: async (id) => {
+    try {
+      await ensureDatabaseInitialized();
+      const recurringEntry = await storeRepositories.recurringEntryRepository.getById(id);
+      await syncService.queueDelete('recurring_entries', recurringEntry);
+      await storeRepositories.recurringEntryRepository.delete(id);
+      await get().reloadAll();
+      void get().syncNow();
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível remover o compromisso recorrente.',
       });
       throw error;
     }

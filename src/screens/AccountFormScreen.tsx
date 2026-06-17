@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 
 import { AccountType } from '../database';
 import {
+  ColorPickerField,
   FormField,
   FormScreen,
+  IconPickerField,
   ModalSelector,
   OptionItem,
   OptionSelector,
@@ -211,19 +213,17 @@ export function AccountFormScreen(): React.JSX.Element {
         value={values.currency}
       />
 
-      <FormField
+      <ColorPickerField
         hint="Opcional"
         label="Cor"
-        onChangeText={(color) => setValues((current) => ({ ...current, color }))}
-        placeholder="#D95032"
+        onChange={(color) => setValues((current) => ({ ...current, color }))}
         value={values.color}
       />
 
-      <FormField
+      <IconPickerField
         hint="Opcional"
         label="Ícone"
-        onChangeText={(icon) => setValues((current) => ({ ...current, icon }))}
-        placeholder="wallet"
+        onChange={(icon) => setValues((current) => ({ ...current, icon }))}
         value={values.icon}
       />
     </FormScreen>

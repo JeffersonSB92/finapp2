@@ -7,6 +7,7 @@ export interface AccountManagerItem {
   id: number;
   name: string;
   typeLabel: string;
+  icon: string | null;
   iconLabel: string;
   ownerName: string | null;
   initialBalance: string;
@@ -66,6 +67,7 @@ function mapAccount(
   return {
     id: account.id,
     name: account.name,
+    icon: account.icon,
     typeLabel: presentation.typeLabel,
     iconLabel: presentation.iconLabel,
     ownerName: account.owner_person_id

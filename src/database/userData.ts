@@ -6,6 +6,7 @@ const USER_TABLES = [
   'categories',
   'subcategories',
   'transactions',
+  'recurring_entries',
   'planning',
   'planning_settings',
 ] as const;
@@ -28,11 +29,12 @@ export async function claimLegacyLocalDataForScope(
           + (SELECT COUNT(*) FROM categories WHERE user_id = ?)
           + (SELECT COUNT(*) FROM subcategories WHERE user_id = ?)
           + (SELECT COUNT(*) FROM transactions WHERE user_id = ?)
+          + (SELECT COUNT(*) FROM recurring_entries WHERE user_id = ?)
           + (SELECT COUNT(*) FROM planning WHERE user_id = ?)
           + (SELECT COUNT(*) FROM planning_settings WHERE user_id = ?)
         ) AS count
     `,
-    [scopeId, scopeId, scopeId, scopeId, scopeId, scopeId, scopeId],
+    [scopeId, scopeId, scopeId, scopeId, scopeId, scopeId, scopeId, scopeId],
   );
 
   if ((existingOwnedRow?.count ?? 0) > 0) {

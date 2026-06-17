@@ -20,6 +20,7 @@ const SYNC_TABLES: SyncTableName[] = [
   'subcategories',
   'planning_settings',
   'transactions',
+  'recurring_entries',
   'planning',
 ];
 
@@ -352,6 +353,42 @@ async function buildRemoteRecord(
     };
   }
 
+  if (tableName === 'recurring_entries') {
+    return {
+      sync_id: String(payload.sync_id),
+      user_id: authenticatedUserId,
+      household_id: householdId,
+      device_id: deviceId,
+      account_sync_id: await getRelatedSyncId(
+        'accounts',
+        payload.account_id as number | null,
+      ),
+      person_sync_id: await getRelatedSyncId(
+        'people',
+        payload.person_id as number | null,
+      ),
+      category_sync_id: await getRelatedSyncId(
+        'categories',
+        payload.category_id as number | null,
+      ),
+      subcategory_sync_id: await getRelatedSyncId(
+        'subcategories',
+        payload.subcategory_id as number | null,
+      ),
+      name: String(payload.name),
+      type: String(payload.type),
+      group_type: String(payload.group_type),
+      amount: Number(payload.amount),
+      day_of_month: Number(payload.day_of_month),
+      notes: (payload.notes as string | null) ?? null,
+      is_active: toBoolean(payload.is_active),
+      created_at: String(payload.created_at),
+      updated_at: String(payload.updated_at),
+      is_deleted: false,
+      deleted_at: null,
+    };
+  }
+
   if (tableName === 'planning') {
     return {
       sync_id: String(payload.sync_id),
@@ -419,6 +456,72 @@ async function getQueue(): Promise<SyncQueueRow[]> {
   return db.getAllAsync<SyncQueueRow>(
     'SELECT * FROM sync_queue WHERE user_id = ? ORDER BY created_at ASC, id ASC',
     [userId],
+  );
+}
+
+async function fetchRemoteRowsForTable(
+  tableName: SyncTableName,
+  cursor: string | null,
+  scopeId: string,
+): Promise<RemoteSyncRow[]> {
+  const client = getSupabaseClient();
+  const authenticatedUserId = getCurrentAuthenticatedUserId();
+
+  if (!client) {
+    return [];
+  }
+
+  const mergedRows = new Map<string, RemoteSyncRow>();
+
+  let householdQuery = client
+    .from(tableName)
+    .select('*')
+    .eq('household_id', scopeId)
+    .order('updated_at', { ascending: true });
+
+  if (cursor) {
+    householdQuery = householdQuery.gte('updated_at', cursor);
+  }
+
+  const { data: householdRows, error: householdError } = await householdQuery;
+
+  if (householdError) {
+    throw householdError;
+  }
+
+  for (const row of (householdRows ?? []) as RemoteSyncRow[]) {
+    mergedRows.set(row.sync_id, row);
+  }
+
+  if (!authenticatedUserId) {
+    return [...mergedRows.values()];
+  }
+
+  let legacyQuery = client
+    .from(tableName)
+    .select('*')
+    .eq('user_id', authenticatedUserId)
+    .is('household_id', null)
+    .order('updated_at', { ascending: true });
+
+  if (cursor) {
+    legacyQuery = legacyQuery.gte('updated_at', cursor);
+  }
+
+  const { data: legacyRows, error: legacyError } = await legacyQuery;
+
+  if (legacyError) {
+    throw legacyError;
+  }
+
+  for (const row of (legacyRows ?? []) as RemoteSyncRow[]) {
+    if (!mergedRows.has(row.sync_id)) {
+      mergedRows.set(row.sync_id, row);
+    }
+  }
+
+  return [...mergedRows.values()].sort((left, right) =>
+    left.updated_at.localeCompare(right.updated_at),
   );
 }
 
@@ -761,6 +864,90 @@ async function upsertTransaction(
   return true;
 }
 
+async function upsertRecurringEntry(
+  row: RemoteSyncRow,
+  syncedAt: string,
+): Promise<boolean> {
+  const localScopeId = toStringValue(row.household_id ?? row.user_id);
+  const accountId = await resolveLocalId(
+    'accounts',
+    row.account_sync_id as string | null,
+  );
+  const personId = await resolveLocalId(
+    'people',
+    row.person_sync_id as string | null,
+  );
+  const categoryId = await resolveLocalId(
+    'categories',
+    row.category_sync_id as string | null,
+  );
+  const subcategoryId = await resolveLocalId(
+    'subcategories',
+    row.subcategory_sync_id as string | null,
+  );
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      INSERT INTO recurring_entries (
+        sync_id,
+        user_id,
+        account_id,
+        person_id,
+        category_id,
+        subcategory_id,
+        name,
+        type,
+        group_type,
+        amount,
+        day_of_month,
+        notes,
+        is_active,
+        created_at,
+        updated_at,
+        last_synced_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(sync_id) DO UPDATE SET
+        user_id = excluded.user_id,
+        account_id = excluded.account_id,
+        person_id = excluded.person_id,
+        category_id = excluded.category_id,
+        subcategory_id = excluded.subcategory_id,
+        name = excluded.name,
+        type = excluded.type,
+        group_type = excluded.group_type,
+        amount = excluded.amount,
+        day_of_month = excluded.day_of_month,
+        notes = excluded.notes,
+        is_active = excluded.is_active,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        last_synced_at = excluded.last_synced_at
+    `,
+    [
+      row.sync_id,
+      localScopeId,
+      accountId,
+      personId,
+      categoryId,
+      subcategoryId,
+      toStringValue(row.name),
+      toStringValue(row.type),
+      toStringValue(row.group_type),
+      toNumberValue(row.amount),
+      toNumberValue(row.day_of_month),
+      toNullableString(row.notes),
+      row.is_active ? 1 : 0,
+      toStringValue(row.created_at),
+      toStringValue(row.updated_at),
+      syncedAt,
+    ],
+  );
+
+  return true;
+}
+
 async function upsertPlanning(
   row: RemoteSyncRow,
   syncedAt: string,
@@ -901,6 +1088,10 @@ async function applyRemoteRow(
     return upsertTransaction(row, syncedAt);
   }
 
+  if (tableName === 'recurring_entries') {
+    return upsertRecurringEntry(row, syncedAt);
+  }
+
   if (tableName === 'planning') {
     return upsertPlanning(row, syncedAt);
   }
@@ -959,6 +1150,7 @@ export class SyncService {
 
   async syncNow(): Promise<SyncResult> {
     const client = getSupabaseClient();
+    const scopeId = getCurrentDatabaseUserId();
 
     if (!client) {
       return {
@@ -969,6 +1161,15 @@ export class SyncService {
           (await getMetadata(
             `last_sync_completed_at:${getCurrentDatabaseUserId() ?? 'anonymous'}`,
           )) ?? null,
+      };
+    }
+
+    if (!scopeId) {
+      return {
+        pushed: 0,
+        pulled: 0,
+        pending: await getPendingCount(),
+        lastSyncAt: null,
       };
     }
 
@@ -1017,22 +1218,9 @@ export class SyncService {
     let newestCursor = cursor;
 
     for (const tableName of SYNC_TABLES) {
-      let query = client
-        .from(tableName)
-        .select('*')
-        .order('updated_at', { ascending: true });
+      const rows = await fetchRemoteRowsForTable(tableName, cursor, scopeId);
 
-      if (cursor) {
-        query = query.gte('updated_at', cursor);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw error;
-      }
-
-      for (const row of (data ?? []) as RemoteSyncRow[]) {
+      for (const row of rows) {
         const applied = await applyRemoteRow(tableName, row, syncedAt);
 
         if (applied) {

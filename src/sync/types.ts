@@ -6,6 +6,7 @@ export type SyncTableName =
   | 'categories'
   | 'subcategories'
   | 'transactions'
+  | 'recurring_entries'
   | 'planning'
   | 'planning_settings';
 

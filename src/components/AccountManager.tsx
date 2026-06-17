@@ -10,7 +10,7 @@ import {
 
 import { useAccountManager } from '../hooks/useAccountManager';
 import { theme } from '../theme/theme';
-import { AppButton, AppCard, EmptyState } from './ui';
+import { AppButton, AppCard, EmptyState, IconBadge } from './ui';
 
 interface AccountManagerProps {
   onAddAccount?: () => void;
@@ -106,14 +106,11 @@ export function AccountManager({
                 <AppCard key={account.id} style={styles.accountCard}>
                   <View style={styles.accountTopRow}>
                     <View style={styles.leading}>
-                      <View
-                        style={[
-                          styles.iconBadge,
-                          account.color ? { backgroundColor: account.color } : null,
-                        ]}
-                      >
-                        <Text style={styles.iconBadgeText}>{account.iconLabel}</Text>
-                      </View>
+                      <IconBadge
+                        backgroundColor={account.color}
+                        fallbackLabel={account.iconLabel}
+                        iconName={account.icon}
+                      />
 
                       <View style={styles.accountInfo}>
                         <Text numberOfLines={1} style={styles.accountName}>
@@ -285,20 +282,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.md,
     minWidth: 0,
-  },
-  iconBadge: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.background.surfaceSoft,
-    borderRadius: theme.radii.lg,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  iconBadgeText: {
-    color: theme.colors.brand.white,
-    fontFamily: theme.fonts.family.bold,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
   },
   accountInfo: {
     flex: 1,

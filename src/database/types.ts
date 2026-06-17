@@ -58,6 +58,26 @@ export interface Subcategory extends SyncMetadata {
   updated_at: ISODateString;
 }
 
+export type RecurringEntryGroup = 'fixed' | 'variable';
+
+export interface RecurringEntry extends SyncMetadata {
+  id: number;
+  user_id: string;
+  account_id: number | null;
+  person_id: number | null;
+  category_id: number | null;
+  subcategory_id: number | null;
+  name: string;
+  type: TransactionType;
+  group_type: RecurringEntryGroup;
+  amount: number;
+  day_of_month: number;
+  notes: string | null;
+  is_active: boolean;
+  created_at: ISODateString;
+  updated_at: ISODateString;
+}
+
 export interface Transaction extends SyncMetadata {
   id: number;
   user_id: string;

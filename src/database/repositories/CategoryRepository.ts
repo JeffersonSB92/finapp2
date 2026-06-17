@@ -126,9 +126,33 @@ export class CategoryRepository {
 
   async delete(id: number): Promise<void> {
     const db = await getDatabase();
-    await db.runAsync('DELETE FROM categories WHERE id = ? AND user_id = ?', [
-      id,
-      getCurrentUserIdOrThrow(),
-    ]);
+    const userId = getCurrentUserIdOrThrow();
+    const usage = await db.getFirstAsync<{
+      planning_count: number;
+      subcategories_count: number;
+      transactions_count: number;
+    }>(
+      `
+        SELECT
+          (SELECT COUNT(*) FROM subcategories WHERE category_id = ? AND user_id = ?) AS subcategories_count,
+          (SELECT COUNT(*) FROM transactions WHERE category_id = ? AND user_id = ?) AS transactions_count,
+          (SELECT COUNT(*) FROM planning WHERE category_id = ? AND user_id = ?) AS planning_count
+      `,
+      [id, userId, id, userId, id, userId],
+    );
+
+    if ((usage?.subcategories_count ?? 0) > 0) {
+      throw new Error(
+        'Essa categoria possui subcategorias vinculadas. Remova ou reatribua as subcategorias antes de excluir.',
+      );
+    }
+
+    if ((usage?.transactions_count ?? 0) > 0 || (usage?.planning_count ?? 0) > 0) {
+      throw new Error(
+        'Essa categoria está vinculada a transações ou planejamentos. Reatribua esses registros antes de excluir.',
+      );
+    }
+
+    await db.runAsync('DELETE FROM categories WHERE id = ? AND user_id = ?', [id, userId]);
   }
 }

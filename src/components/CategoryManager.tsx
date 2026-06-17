@@ -12,7 +12,7 @@ import {
 import { TransactionType } from '../database';
 import { useCategoryManager } from '../hooks/useCategoryManager';
 import { theme } from '../theme/theme';
-import { AppButton, AppCard, EmptyState } from './ui';
+import { AppButton, AppCard, EmptyState, IconBadge } from './ui';
 
 interface CategoryManagerProps {
   onAddCategory?: () => void;
@@ -99,14 +99,11 @@ export function CategoryManager({
                     style={[styles.categoryHeader, isCompactLayout ? styles.categoryHeaderCompact : null]}
                   >
                     <View style={styles.categoryLeading}>
-                      <View
-                        style={[
-                          styles.iconBadge,
-                          category.color ? { backgroundColor: category.color } : null,
-                        ]}
-                      >
-                        <Text style={styles.iconBadgeText}>{category.iconLabel}</Text>
-                      </View>
+                      <IconBadge
+                        backgroundColor={category.color}
+                        fallbackLabel={category.iconLabel}
+                        iconName={category.icon}
+                      />
 
                       <View style={styles.categoryInfo}>
                         <Text numberOfLines={1} style={styles.categoryName}>
@@ -168,14 +165,23 @@ export function CategoryManager({
                             style={styles.subcategoryItem}
                           >
                             <View style={styles.subcategoryLeft}>
-                              <View
-                                style={[
-                                  styles.subcategoryDot,
-                                  subcategory.color
-                                    ? { backgroundColor: subcategory.color }
-                                    : null,
-                                ]}
-                              />
+                              {subcategory.icon ? (
+                                <IconBadge
+                                  backgroundColor={subcategory.color}
+                                  fallbackLabel={subcategory.name.slice(0, 2).toUpperCase()}
+                                  iconName={subcategory.icon}
+                                  size={28}
+                                />
+                              ) : (
+                                <View
+                                  style={[
+                                    styles.subcategoryDot,
+                                    subcategory.color
+                                      ? { backgroundColor: subcategory.color }
+                                      : null,
+                                  ]}
+                                />
+                              )}
                               <Text numberOfLines={1} style={styles.subcategoryName}>
                                 {subcategory.name}
                               </Text>
@@ -277,20 +283,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.md,
     minWidth: 0,
-  },
-  iconBadge: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.background.surfaceSoft,
-    borderRadius: theme.radii.lg,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  iconBadgeText: {
-    color: theme.colors.brand.white,
-    fontFamily: theme.fonts.family.bold,
-    fontSize: theme.fonts.size.sm,
-    lineHeight: theme.fonts.lineHeight.sm,
   },
   categoryInfo: {
     flex: 1,

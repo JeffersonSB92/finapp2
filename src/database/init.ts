@@ -12,6 +12,7 @@ const SYNC_TABLES = [
   'categories',
   'subcategories',
   'transactions',
+  'recurring_entries',
   'planning',
   'planning_settings',
 ] as const;

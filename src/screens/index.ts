@@ -3,5 +3,7 @@ export * from './AuthScreen';
 export * from './CategoryFormScreen';
 export * from './PlanningSettingsScreen';
 export * from './PeopleScreen';
+export * from './RecurringEntryFormScreen';
 export * from './SettingsScreen';
+export * from './SubcategoryFormScreen';
 export * from './TransactionFormScreen';

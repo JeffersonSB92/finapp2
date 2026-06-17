@@ -19,9 +19,9 @@ import {
   BottomTabBar,
   CategoryManager,
   Dashboard,
+  ForecastScreen,
   FloatingActionMenu,
   GraphScreen,
-  PlanningSettings,
   TransactionForm,
   TransactionList,
 } from './src/components';
@@ -30,7 +30,9 @@ import {
   AuthScreen,
   CategoryFormScreen,
   PeopleScreen,
+  RecurringEntryFormScreen,
   SettingsScreen,
+  SubcategoryFormScreen,
 } from './src/screens';
 import { useAuthStore } from './src/store/authStore';
 import { useFinanceStore } from './src/store';
@@ -45,7 +47,9 @@ type AppRoute =
   | 'account-form'
   | 'categories'
   | 'category-form'
+  | 'subcategory-form'
   | 'planning'
+  | 'recurring-entry-form'
   | 'people'
   | 'settings';
 
@@ -102,6 +106,10 @@ export default function App(): React.JSX.Element {
   const financeError = useFinanceStore((state) => state.error);
   const [route, setRoute] = useState<AppRoute>('dashboard');
   const [editingTransactionId, setEditingTransactionId] = useState<number | undefined>();
+  const [editingCategoryId, setEditingCategoryId] = useState<number | undefined>();
+  const [editingSubcategoryId, setEditingSubcategoryId] = useState<number | undefined>();
+  const [editingRecurringEntryId, setEditingRecurringEntryId] = useState<number | undefined>();
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>();
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
@@ -112,13 +120,21 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     if (!authSession) {
       setRoute('dashboard');
+      setEditingCategoryId(undefined);
+      setEditingSubcategoryId(undefined);
       setEditingTransactionId(undefined);
+      setEditingRecurringEntryId(undefined);
+      setSelectedCategoryId(undefined);
       setIsFabOpen(false);
       return;
     }
 
     setRoute('dashboard');
+    setEditingCategoryId(undefined);
+    setEditingSubcategoryId(undefined);
     setEditingTransactionId(undefined);
+    setEditingRecurringEntryId(undefined);
+    setSelectedCategoryId(undefined);
     setIsFabOpen(false);
     void initializeFinance();
   }, [authSession, initializeFinance]);
@@ -155,7 +171,8 @@ export default function App(): React.JSX.Element {
       route === 'settings' ||
       route === 'people' ||
       route === 'categories' ||
-      route === 'category-form'
+      route === 'category-form' ||
+      route === 'subcategory-form'
     ) {
       return 'settings';
     }
@@ -197,6 +214,21 @@ export default function App(): React.JSX.Element {
 
     if (route === 'analytics') {
       return <GraphScreen />;
+    }
+
+    if (route === 'planning') {
+      return (
+        <ForecastScreen
+          onAddRecurringEntry={() => {
+            setEditingRecurringEntryId(undefined);
+            setRoute('recurring-entry-form');
+          }}
+          onEditRecurringEntry={(id) => {
+            setEditingRecurringEntryId(id);
+            setRoute('recurring-entry-form');
+          }}
+        />
+      );
     }
 
     if (route === 'transactions') {
@@ -255,7 +287,28 @@ export default function App(): React.JSX.Element {
     }
 
     if (route === 'categories') {
-      return <CategoryManager onAddCategory={() => setRoute('category-form')} />;
+      return (
+        <CategoryManager
+          onAddCategory={() => {
+            setEditingCategoryId(undefined);
+            setRoute('category-form');
+          }}
+          onAddSubcategory={(categoryId) => {
+            setSelectedCategoryId(categoryId);
+            setEditingSubcategoryId(undefined);
+            setRoute('subcategory-form');
+          }}
+          onEditCategory={(categoryId) => {
+            setEditingCategoryId(categoryId);
+            setRoute('category-form');
+          }}
+          onEditSubcategory={(subcategoryId) => {
+            setEditingSubcategoryId(subcategoryId);
+            setSelectedCategoryId(undefined);
+            setRoute('subcategory-form');
+          }}
+        />
+      );
     }
 
     if (route === 'category-form') {
@@ -265,10 +318,74 @@ export default function App(): React.JSX.Element {
             <HeaderAction
               icon="chevron-left"
               label="Voltar"
-              onPress={() => setRoute('categories')}
+              onPress={() => {
+                setEditingCategoryId(undefined);
+                setRoute('categories');
+              }}
             />
           </View>
-          <CategoryFormScreen />
+          <CategoryFormScreen
+            categoryId={editingCategoryId}
+            onSuccess={
+              editingCategoryId
+                ? () => {
+                    setEditingCategoryId(undefined);
+                    setRoute('categories');
+                  }
+                : undefined
+            }
+          />
+        </View>
+      );
+    }
+
+    if (route === 'subcategory-form') {
+      return (
+        <View style={styles.formWrapper}>
+          <View style={styles.formHeader}>
+            <HeaderAction
+              icon="chevron-left"
+              label="Voltar"
+              onPress={() => {
+                setEditingSubcategoryId(undefined);
+                setSelectedCategoryId(undefined);
+                setRoute('categories');
+              }}
+            />
+          </View>
+          <SubcategoryFormScreen
+            initialCategoryId={selectedCategoryId}
+            onSuccess={() => {
+              setEditingSubcategoryId(undefined);
+              setSelectedCategoryId(undefined);
+              setRoute('categories');
+            }}
+            subcategoryId={editingSubcategoryId}
+          />
+        </View>
+      );
+    }
+
+    if (route === 'recurring-entry-form') {
+      return (
+        <View style={styles.formWrapper}>
+          <View style={styles.formHeader}>
+            <HeaderAction
+              icon="chevron-left"
+              label="Voltar"
+              onPress={() => {
+                setEditingRecurringEntryId(undefined);
+                setRoute('planning');
+              }}
+            />
+          </View>
+          <RecurringEntryFormScreen
+            onSuccess={() => {
+              setEditingRecurringEntryId(undefined);
+              setRoute('planning');
+            }}
+            recurringEntryId={editingRecurringEntryId}
+          />
         </View>
       );
     }
@@ -292,7 +409,18 @@ export default function App(): React.JSX.Element {
       );
     }
 
-    return <PlanningSettings />;
+    return (
+      <ForecastScreen
+        onAddRecurringEntry={() => {
+          setEditingRecurringEntryId(undefined);
+          setRoute('recurring-entry-form');
+        }}
+        onEditRecurringEntry={(id) => {
+          setEditingRecurringEntryId(id);
+          setRoute('recurring-entry-form');
+        }}
+      />
+    );
   }
 
   return (

@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import { FormField } from '../components/form';
+import { ColorPickerField, FormField } from '../components/form';
 import { AppButton, AppCard, EmptyState } from '../components/ui';
 import { useFinanceStore } from '../store';
 import { useAuthStore } from '../store/authStore';
@@ -140,11 +140,10 @@ export function PeopleScreen(): React.JSX.Element {
           value={values.name}
         />
 
-        <FormField
+        <ColorPickerField
           hint="Opcional"
           label="Cor"
-          onChangeText={(color) => setValues((current) => ({ ...current, color }))}
-          placeholder="#D95032"
+          onChange={(color) => setValues((current) => ({ ...current, color }))}
           value={values.color}
         />
 

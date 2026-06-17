@@ -3,6 +3,7 @@ export * from './CategoryManager';
 export * from './form';
 export * from './CategorySpendingPieChart';
 export * from './Dashboard';
+export * from './ForecastScreen';
 export * from './GraphScreen';
 export * from './MonthlyComparisonChart';
 export * from './PlanningSettings';
