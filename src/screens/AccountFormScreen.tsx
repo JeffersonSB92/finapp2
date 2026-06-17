@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from 'react';
 
 import { AccountType } from '../database';
-import { FormField, FormScreen, OptionItem, OptionSelector } from '../components/form';
+import {
+  FormField,
+  FormScreen,
+  ModalSelector,
+  OptionItem,
+  OptionSelector,
+} from '../components/form';
 import { useFinanceStore } from '../store';
+import { useAuthStore } from '../store/authStore';
 
 interface AccountFormValues {
   name: string;
   type: AccountType;
+  ownerPersonId: number | null;
   balance: string;
   currency: string;
   color: string;
@@ -16,6 +24,7 @@ interface AccountFormValues {
 interface AccountFormErrors {
   name?: string;
   type?: string;
+  ownerPersonId?: string;
   balance?: string;
   currency?: string;
 }
@@ -29,7 +38,10 @@ const accountTypeOptions: OptionItem<AccountType>[] = [
   { label: 'Outro', value: AccountType.OTHER },
 ];
 
-function validateAccount(values: AccountFormValues): AccountFormErrors {
+function validateAccount(
+  values: AccountFormValues,
+  requiresOwner: boolean,
+): AccountFormErrors {
   const errors: AccountFormErrors = {};
   const balance = Number(values.balance);
 
@@ -39,6 +51,10 @@ function validateAccount(values: AccountFormValues): AccountFormErrors {
 
   if (!values.type) {
     errors.type = 'Selecione um tipo de conta.';
+  }
+
+  if (requiresOwner && values.ownerPersonId === null) {
+    errors.ownerPersonId = 'Selecione a pessoa dona da conta.';
   }
 
   if (Number.isNaN(balance)) {
@@ -54,12 +70,15 @@ function validateAccount(values: AccountFormValues): AccountFormErrors {
 
 export function AccountFormScreen(): React.JSX.Element {
   const initialize = useFinanceStore((state) => state.initialize);
+  const people = useFinanceStore((state) => state.people);
   const addAccount = useFinanceStore((state) => state.addAccount);
   const storeError = useFinanceStore((state) => state.error);
+  const session = useAuthStore((state) => state.session);
 
   const [values, setValues] = useState<AccountFormValues>({
     name: '',
     type: AccountType.CHECKING,
+    ownerPersonId: null,
     balance: '0',
     currency: 'BRL',
     color: '',
@@ -69,12 +88,37 @@ export function AccountFormScreen(): React.JSX.Element {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const personOptions = people
+    .filter((person) => person.is_active)
+    .map((person) => ({
+      label: person.name,
+      value: person.id,
+    }));
+
+  const currentUserPersonId =
+    people.find((person) => person.auth_user_id === session?.user.id)?.id ?? null;
+
   useEffect(() => {
     void initialize();
   }, [initialize]);
 
+  useEffect(() => {
+    if (currentUserPersonId === null) {
+      return;
+    }
+
+    setValues((current) =>
+      current.ownerPersonId === null
+        ? {
+            ...current,
+            ownerPersonId: currentUserPersonId,
+          }
+        : current,
+    );
+  }, [currentUserPersonId]);
+
   async function handleSubmit(): Promise<void> {
-    const nextErrors = validateAccount(values);
+    const nextErrors = validateAccount(values, personOptions.length > 0);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -86,6 +130,7 @@ export function AccountFormScreen(): React.JSX.Element {
 
     try {
       await addAccount({
+        owner_person_id: values.ownerPersonId,
         name: values.name.trim(),
         type: values.type,
         balance: Number(values.balance),
@@ -98,6 +143,7 @@ export function AccountFormScreen(): React.JSX.Element {
       setValues({
         name: '',
         type: AccountType.CHECKING,
+        ownerPersonId: null,
         balance: '0',
         currency: 'BRL',
         color: '',
@@ -134,6 +180,17 @@ export function AccountFormScreen(): React.JSX.Element {
         onChange={(type) => setValues((current) => ({ ...current, type }))}
         options={accountTypeOptions}
         selectedValue={values.type}
+      />
+
+      <ModalSelector
+        error={errors.ownerPersonId}
+        label="Pessoa dona da conta"
+        onSelect={(ownerPersonId) =>
+          setValues((current) => ({ ...current, ownerPersonId }))
+        }
+        options={personOptions}
+        placeholder="Selecione uma pessoa"
+        selectedValue={values.ownerPersonId}
       />
 
       <FormField

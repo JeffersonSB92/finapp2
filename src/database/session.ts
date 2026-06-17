@@ -1,4 +1,5 @@
 let currentDatabaseUserId: string | null = null;
+let currentAuthenticatedUserId: string | null = null;
 
 export function setCurrentDatabaseUserId(userId: string | null): void {
   currentDatabaseUserId = userId;
@@ -14,4 +15,20 @@ export function requireCurrentDatabaseUserId(): string {
   }
 
   return currentDatabaseUserId;
+}
+
+export function setCurrentAuthenticatedUserId(userId: string | null): void {
+  currentAuthenticatedUserId = userId;
+}
+
+export function getCurrentAuthenticatedUserId(): string | null {
+  return currentAuthenticatedUserId;
+}
+
+export function requireCurrentAuthenticatedUserId(): string {
+  if (!currentAuthenticatedUserId) {
+    throw new Error('No authenticated Supabase user available.');
+  }
+
+  return currentAuthenticatedUserId;
 }

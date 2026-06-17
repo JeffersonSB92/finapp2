@@ -169,6 +169,10 @@ function getTransactionIndicator(
   };
 }
 
+function isPaidExpense(amountType: TransactionType, isPaid: boolean): boolean {
+  return amountType === TransactionType.EXPENSE && isPaid;
+}
+
 export function useDashboard(): UseDashboardResult {
   const [referenceDate, setReferenceDate] = useState<Date>(getCurrentMonthDate());
 
@@ -225,7 +229,7 @@ export function useDashboard(): UseDashboardResult {
   const totalDespesas = useMemo(
     () =>
       monthTransactions.reduce((total, transaction) => {
-        if (transaction.type !== TransactionType.EXPENSE) {
+        if (!isPaidExpense(transaction.type, transaction.is_paid)) {
           return total;
         }
 

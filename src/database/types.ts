@@ -23,6 +23,7 @@ export enum AccountType {
 export interface Account extends SyncMetadata {
   id: number;
   user_id: string;
+  owner_person_id: number | null;
   name: string;
   type: AccountType;
   balance: number;
@@ -62,6 +63,10 @@ export interface Transaction extends SyncMetadata {
   user_id: string;
   account_id: number;
   destination_account_id: number | null;
+  person_id: number | null;
+  installment_group_id: string | null;
+  installment_index: number | null;
+  installment_count: number | null;
   category_id: number | null;
   subcategory_id: number | null;
   type: TransactionType;
@@ -93,6 +98,17 @@ export interface PlanningSettings extends SyncMetadata {
   essential_percentage: number;
   non_essential_percentage: number;
   savings_percentage: number;
+  created_at: ISODateString;
+  updated_at: ISODateString;
+}
+
+export interface Person extends SyncMetadata {
+  id: number;
+  user_id: string;
+  auth_user_id: string | null;
+  name: string;
+  color: string | null;
+  is_active: boolean;
   created_at: ISODateString;
   updated_at: ISODateString;
 }

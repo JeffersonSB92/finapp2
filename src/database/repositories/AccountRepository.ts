@@ -14,6 +14,7 @@ interface AccountRow {
   sync_id: string;
   user_id: string;
   last_synced_at: ISODateString | null;
+  owner_person_id: number | null;
   name: string;
   type: AccountType;
   balance: number;
@@ -26,6 +27,7 @@ interface AccountRow {
 }
 
 export interface CreateAccountInput {
+  owner_person_id?: number | null;
   name: string;
   type: AccountType;
   balance?: number;
@@ -36,6 +38,7 @@ export interface CreateAccountInput {
 }
 
 export interface UpdateAccountInput {
+  owner_person_id?: number | null;
   name?: string;
   type?: AccountType;
   balance?: number;
@@ -61,6 +64,7 @@ export class AccountRepository {
         INSERT INTO accounts (
           sync_id,
           user_id,
+          owner_person_id,
           name,
           type,
           balance,
@@ -69,11 +73,12 @@ export class AccountRepository {
           icon,
           is_active
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         generateSyncId(),
         userId,
+        input.owner_person_id ?? null,
         input.name,
         input.type,
         input.balance ?? 0,
@@ -119,6 +124,7 @@ export class AccountRepository {
       `
         UPDATE accounts
         SET
+          owner_person_id = ?,
           name = ?,
           type = ?,
           balance = ?,
@@ -131,6 +137,7 @@ export class AccountRepository {
         WHERE id = ? AND user_id = ?
       `,
       [
+        resolveUpdateValue(input.owner_person_id, current.owner_person_id),
         resolveUpdateValue(input.name, current.name),
         resolveUpdateValue(input.type, current.type),
         resolveUpdateValue(input.balance, current.balance),

@@ -7,6 +7,7 @@ import {
 import { generateSyncId } from './repositories/shared';
 
 const SYNC_TABLES = [
+  'people',
   'accounts',
   'categories',
   'subcategories',
@@ -37,6 +38,18 @@ async function ensureColumn(
 
 async function ensureTransactionMigrations(): Promise<void> {
   await ensureColumn('transactions', 'is_paid', 'INTEGER NOT NULL DEFAULT 1');
+  await ensureColumn('transactions', 'person_id', 'INTEGER');
+  await ensureColumn('transactions', 'installment_group_id', 'TEXT');
+  await ensureColumn('transactions', 'installment_index', 'INTEGER');
+  await ensureColumn('transactions', 'installment_count', 'INTEGER');
+}
+
+async function ensureAccountMigrations(): Promise<void> {
+  await ensureColumn('accounts', 'owner_person_id', 'INTEGER');
+}
+
+async function ensurePeopleMigrations(): Promise<void> {
+  await ensureColumn('people', 'auth_user_id', 'TEXT');
 }
 
 async function ensureSyncColumns(): Promise<void> {
@@ -78,6 +91,8 @@ async function runDatabaseInitialization(): Promise<void> {
   });
 
   await ensureTransactionMigrations();
+  await ensureAccountMigrations();
+  await ensurePeopleMigrations();
   await ensureSyncColumns();
   await ensureSyncQueueColumns();
   await backfillSyncIds();

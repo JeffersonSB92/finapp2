@@ -39,6 +39,19 @@ export function parseDateInputToIso(value: string): string {
   return new Date(year, month - 1, day, 12, 0, 0, 0).toISOString();
 }
 
+export function addMonthsToIsoDate(dateIso: string, amount: number): string {
+  const date = new Date(dateIso);
+  return new Date(
+    date.getFullYear(),
+    date.getMonth() + amount,
+    date.getDate(),
+    12,
+    0,
+    0,
+    0,
+  ).toISOString();
+}
+
 export function getLocalDateKey(dateIso: string): string {
   return formatIsoDateInput(dateIso);
 }

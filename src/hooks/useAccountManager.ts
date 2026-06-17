@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 
-import { Account, AccountType } from '../database';
+import { Account, AccountType, Person } from '../database';
 import { useFinanceStore } from '../store';
 
 export interface AccountManagerItem {
@@ -8,6 +8,7 @@ export interface AccountManagerItem {
   name: string;
   typeLabel: string;
   iconLabel: string;
+  ownerName: string | null;
   initialBalance: string;
   currentBalance: string;
   tone: 'positive' | 'negative' | 'neutral';
@@ -56,7 +57,10 @@ function getPresentationType(account: Account): {
   };
 }
 
-function mapAccount(account: Account): AccountManagerItem {
+function mapAccount(
+  account: Account,
+  peopleById: Map<number, Person>,
+): AccountManagerItem {
   const presentation = getPresentationType(account);
 
   return {
@@ -64,6 +68,9 @@ function mapAccount(account: Account): AccountManagerItem {
     name: account.name,
     typeLabel: presentation.typeLabel,
     iconLabel: presentation.iconLabel,
+    ownerName: account.owner_person_id
+      ? peopleById.get(account.owner_person_id)?.name ?? null
+      : null,
     initialBalance: formatCurrency(account.balance),
     currentBalance: formatCurrency(account.balance),
     tone: account.balance > 0 ? 'positive' : account.balance < 0 ? 'negative' : 'neutral',
@@ -75,6 +82,7 @@ function mapAccount(account: Account): AccountManagerItem {
 export function useAccountManager(): UseAccountManagerResult {
   const initialize = useFinanceStore((state) => state.initialize);
   const accounts = useFinanceStore((state) => state.accounts);
+  const people = useFinanceStore((state) => state.people);
   const isLoading = useFinanceStore((state) => state.isLoading);
   const error = useFinanceStore((state) => state.error);
 
@@ -82,7 +90,10 @@ export function useAccountManager(): UseAccountManagerResult {
     void initialize();
   }, [initialize]);
 
-  const mappedAccounts = useMemo(() => accounts.map(mapAccount), [accounts]);
+  const mappedAccounts = useMemo(() => {
+    const peopleById = new Map(people.map((person) => [person.id, person]));
+    return accounts.map((account) => mapAccount(account, peopleById));
+  }, [accounts, people]);
 
   const totalBalance = useMemo(
     () =>
@@ -111,4 +122,3 @@ export function useAccountManager(): UseAccountManagerResult {
     error,
   };
 }
-

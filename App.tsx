@@ -29,6 +29,7 @@ import {
   AccountFormScreen,
   AuthScreen,
   CategoryFormScreen,
+  PeopleScreen,
   SettingsScreen,
 } from './src/screens';
 import { useAuthStore } from './src/store/authStore';
@@ -45,6 +46,7 @@ type AppRoute =
   | 'categories'
   | 'category-form'
   | 'planning'
+  | 'people'
   | 'settings';
 
 interface TabOption {
@@ -151,6 +153,7 @@ export default function App(): React.JSX.Element {
 
     if (
       route === 'settings' ||
+      route === 'people' ||
       route === 'categories' ||
       route === 'category-form'
     ) {
@@ -271,7 +274,22 @@ export default function App(): React.JSX.Element {
     }
 
     if (route === 'settings') {
-      return <SettingsScreen />;
+      return <SettingsScreen onOpenPeople={() => setRoute('people')} />;
+    }
+
+    if (route === 'people') {
+      return (
+        <View style={styles.formWrapper}>
+          <View style={styles.formHeader}>
+            <HeaderAction
+              icon="chevron-left"
+              label="Voltar"
+              onPress={() => setRoute('settings')}
+            />
+          </View>
+          <PeopleScreen />
+        </View>
+      );
     }
 
     return <PlanningSettings />;

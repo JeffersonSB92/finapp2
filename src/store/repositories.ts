@@ -3,6 +3,7 @@ import {
   CategoryRepository,
   PlanningRepository,
   PlanningSettingsRepository,
+  PersonRepository,
   SubcategoryRepository,
   TransactionRepository,
 } from '../database';
@@ -12,6 +13,7 @@ export interface StoreRepositories {
   categoryRepository: CategoryRepository;
   planningRepository: PlanningRepository;
   planningSettingsRepository: PlanningSettingsRepository;
+  personRepository: PersonRepository;
   subcategoryRepository: SubcategoryRepository;
   transactionRepository: TransactionRepository;
 }
@@ -21,6 +23,7 @@ export const storeRepositories: StoreRepositories = {
   categoryRepository: new CategoryRepository(),
   planningRepository: new PlanningRepository(),
   planningSettingsRepository: new PlanningSettingsRepository(),
+  personRepository: new PersonRepository(),
   subcategoryRepository: new SubcategoryRepository(),
   transactionRepository: new TransactionRepository(),
 };

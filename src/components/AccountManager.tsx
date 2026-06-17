@@ -120,6 +120,11 @@ export function AccountManager({
                           {account.name}
                         </Text>
                         <Text style={styles.accountType}>{account.typeLabel}</Text>
+                        {account.ownerName ? (
+                          <Text style={styles.accountOwner}>
+                            Titular: {account.ownerName}
+                          </Text>
+                        ) : null}
                       </View>
                     </View>
 
@@ -311,6 +316,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.family.regular,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
+  },
+  accountOwner: {
+    color: theme.colors.text.muted,
+    fontFamily: theme.fonts.family.regular,
+    fontSize: theme.fonts.size.xs,
+    lineHeight: theme.fonts.lineHeight.xs,
   },
   inactiveBadge: {
     backgroundColor: theme.colors.background.surfaceSoft,

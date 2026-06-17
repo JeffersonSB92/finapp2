@@ -62,7 +62,7 @@ export function FloatingActionMenu<Route extends string>({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'flex-end',
-    bottom: theme.spacing.bottomSafe + theme.spacing.md,
+    bottom: theme.spacing.bottomSafe + theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
     position: 'absolute',
     right: 0,

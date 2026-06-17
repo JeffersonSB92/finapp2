@@ -5,6 +5,7 @@ import {
   Category,
   Planning,
   PlanningSettings,
+  Person,
   Subcategory,
   Transaction,
   initDatabase,
@@ -23,6 +24,10 @@ import type {
 } from '../database/repositories/PlanningRepository';
 import type { SavePlanningSettingsInput } from '../database/repositories/PlanningSettingsRepository';
 import type {
+  CreatePersonInput,
+  UpdatePersonInput,
+} from '../database/repositories/PersonRepository';
+import type {
   CreateTransactionInput,
   UpdateTransactionInput,
 } from '../database/repositories/TransactionRepository';
@@ -33,6 +38,7 @@ let financeInitializationPromise: Promise<void> | null = null;
 
 interface FinanceState {
   accounts: Account[];
+  people: Person[];
   transactions: Transaction[];
   categories: Category[];
   subcategories: Subcategory[];
@@ -50,6 +56,7 @@ interface FinanceState {
   syncNow: () => Promise<void>;
   resetForSession: () => void;
   loadAccounts: () => Promise<void>;
+  loadPeople: () => Promise<void>;
   loadTransactions: () => Promise<void>;
   loadCategories: () => Promise<void>;
   loadSubcategories: () => Promise<void>;
@@ -58,6 +65,9 @@ interface FinanceState {
   addAccount: (input: CreateAccountInput) => Promise<Account>;
   updateAccount: (id: number, input: UpdateAccountInput) => Promise<Account>;
   removeAccount: (id: number) => Promise<void>;
+  addPerson: (input: CreatePersonInput) => Promise<Person>;
+  updatePerson: (id: number, input: UpdatePersonInput) => Promise<Person>;
+  removePerson: (id: number) => Promise<void>;
   addTransaction: (input: CreateTransactionInput) => Promise<Transaction>;
   updateTransaction: (
     id: number,
@@ -82,6 +92,10 @@ interface FinanceState {
 }
 
 function sortAccounts(items: Account[]): Account[] {
+  return [...items].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function sortPeople(items: Person[]): Person[] {
   return [...items].sort((left, right) => left.name.localeCompare(right.name));
 }
 
@@ -126,6 +140,7 @@ async function refreshPendingSyncCount(
 
 export const useFinanceStore = create<FinanceState>((set, get) => ({
   accounts: [],
+  people: [],
   transactions: [],
   categories: [],
   subcategories: [],
@@ -182,6 +197,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       await ensureDatabaseInitialized();
       const [
         accounts,
+        people,
         transactions,
         categories,
         subcategories,
@@ -189,6 +205,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         planningSettings,
       ] = await Promise.all([
         storeRepositories.accountRepository.getAll(),
+        storeRepositories.personRepository.getAll(),
         storeRepositories.transactionRepository.getAll(),
         storeRepositories.categoryRepository.getAll(),
         storeRepositories.subcategoryRepository.getAll(),
@@ -198,6 +215,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
 
       set({
         accounts: sortAccounts(accounts),
+        people: sortPeople(people),
         transactions: sortTransactions(transactions),
         categories: sortCategories(categories),
         subcategories,
@@ -246,6 +264,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   resetForSession: () => {
     set({
       accounts: [],
+      people: [],
       transactions: [],
       categories: [],
       subcategories: [],
@@ -269,6 +288,19 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Não foi possível carregar as contas.',
+      });
+      throw error;
+    }
+  },
+
+  loadPeople: async () => {
+    try {
+      await ensureDatabaseInitialized();
+      const people = await storeRepositories.personRepository.getAll();
+      set({ people: sortPeople(people), error: null });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Não foi possível carregar as pessoas.',
       });
       throw error;
     }
@@ -394,14 +426,76 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     }
   },
 
+  addPerson: async (input) => {
+    try {
+      await ensureDatabaseInitialized();
+      const person = await storeRepositories.personRepository.create(input);
+      await syncService.queueUpsert('people', person.sync_id);
+      await get().reloadAll();
+      void get().syncNow();
+      return person;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Não foi possível adicionar a pessoa.',
+      });
+      throw error;
+    }
+  },
+
+  updatePerson: async (id, input) => {
+    try {
+      await ensureDatabaseInitialized();
+      const person = await storeRepositories.personRepository.update(id, input);
+      await syncService.queueUpsert('people', person.sync_id);
+      await get().reloadAll();
+      void get().syncNow();
+      return person;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Não foi possível atualizar a pessoa.',
+      });
+      throw error;
+    }
+  },
+
+  removePerson: async (id) => {
+    try {
+      await ensureDatabaseInitialized();
+      const person = await storeRepositories.personRepository.getById(id);
+      await storeRepositories.personRepository.delete(id);
+      await syncService.queueDelete('people', person);
+      await get().reloadAll();
+      void get().syncNow();
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Não foi possível remover a pessoa.',
+      });
+      throw error;
+    }
+  },
+
   addTransaction: async (input) => {
     try {
       await ensureDatabaseInitialized();
-      const transaction = await storeRepositories.transactionRepository.create(input);
-      await syncService.queueUpsert('transactions', transaction.sync_id);
+      const installmentCount =
+        input.type === 'expense'
+          ? Math.max(1, input.installment_count ?? 1)
+          : 1;
+      const createdTransactions =
+        installmentCount > 1
+          ? await storeRepositories.transactionRepository.createInstallmentSeries(
+              input,
+              installmentCount,
+            )
+          : [await storeRepositories.transactionRepository.create(input)];
+
+      for (const transaction of createdTransactions) {
+        await syncService.queueUpsert('transactions', transaction.sync_id);
+      }
+
       await get().reloadAll();
       void get().syncNow();
-      return transaction;
+      return createdTransactions[0];
     } catch (error) {
       set({
         error:

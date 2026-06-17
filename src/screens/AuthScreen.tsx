@@ -19,21 +19,29 @@ function getActionLabel(mode: AuthMode): string {
 export function AuthScreen(): React.JSX.Element {
   const signIn = useAuthStore((state) => state.signIn);
   const signUp = useAuthStore((state) => state.signUp);
+  const pendingInviteToken = useAuthStore((state) => state.pendingInviteToken);
+  const setPendingInviteToken = useAuthStore((state) => state.setPendingInviteToken);
+  const clearPendingInvite = useAuthStore((state) => state.clearPendingInvite);
   const isLoading = useAuthStore((state) => state.isLoading);
   const storeError = useAuthStore((state) => state.error);
 
   const [mode, setMode] = useState<AuthMode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteInput, setInviteInput] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   const helperText = useMemo(() => {
     if (mode === 'sign-in') {
-      return 'Entre com e-mail e senha para sincronizar seus dados com isolamento por usuário.';
+      return pendingInviteToken
+        ? 'Entre com sua conta para aceitar o convite e acessar o espaco financeiro compartilhado.'
+        : 'Entre com e-mail e senha para acessar seu espaco financeiro e sincronizar seus dados.';
     }
 
-    return 'Crie uma conta para ativar sincronização segura entre dispositivos.';
-  }, [mode]);
+    return pendingInviteToken
+      ? 'Crie sua conta para aceitar o convite e entrar no espaco financeiro compartilhado.'
+      : 'Crie uma conta para ativar sincronização segura entre dispositivos.';
+  }, [mode, pendingInviteToken]);
 
   async function handleSubmit(): Promise<void> {
     if (!email.trim() || !password.trim()) {
@@ -67,7 +75,32 @@ export function AuthScreen(): React.JSX.Element {
         <Text style={styles.title}>{getTitle(mode)}</Text>
         <Text style={styles.subtitle}>{helperText}</Text>
 
+        {pendingInviteToken ? (
+          <View style={styles.inviteBanner}>
+            <Text style={styles.inviteBannerTitle}>Convite detectado</Text>
+            <Text style={styles.inviteBannerText}>
+              Depois do login ou cadastro, sua conta sera vinculada ao espaco compartilhado do proprietario.
+            </Text>
+            <AppButton
+              label="Remover convite"
+              onPress={clearPendingInvite}
+              size="sm"
+              variant="ghost"
+            />
+          </View>
+        ) : null}
+
         <View style={styles.form}>
+          <FormField
+            autoCapitalize="none"
+            label="Link ou token de convite"
+            onChangeText={(value) => {
+              setInviteInput(value);
+              setPendingInviteToken(value);
+            }}
+            placeholder="finapp://invite?token=..."
+            value={inviteInput}
+          />
           <FormField
             autoCapitalize="none"
             autoComplete="email"
@@ -150,6 +183,27 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.family.regular,
     fontSize: theme.fonts.size.md,
     lineHeight: theme.fonts.lineHeight.md,
+  },
+  inviteBanner: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    borderColor: theme.colors.brand.primary,
+    borderRadius: theme.radii.lg,
+    borderWidth: 1,
+    gap: theme.spacing.xs,
+    padding: theme.spacing.md,
+  },
+  inviteBannerTitle: {
+    color: theme.colors.brand.primary,
+    fontFamily: theme.fonts.family.semibold,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
+    textTransform: 'uppercase',
+  },
+  inviteBannerText: {
+    color: theme.colors.text.secondary,
+    fontFamily: theme.fonts.family.regular,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
   },
   form: {
     gap: theme.spacing.md,

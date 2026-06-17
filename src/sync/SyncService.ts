@@ -1,4 +1,5 @@
 import {
+  getCurrentAuthenticatedUserId,
   getCurrentDatabaseUserId,
   getDatabase,
   ISODateString,
@@ -13,6 +14,7 @@ import type {
 } from './types';
 
 const SYNC_TABLES: SyncTableName[] = [
+  'people',
   'accounts',
   'categories',
   'subcategories',
@@ -27,6 +29,7 @@ type RemoteRow = Record<string, boolean | number | string | null | undefined>;
 interface RemoteSyncRow extends RemoteRow {
   sync_id: string;
   updated_at: string;
+  household_id?: string;
   is_deleted?: boolean | null;
 }
 
@@ -86,18 +89,18 @@ async function getDeviceId(): Promise<string> {
 }
 
 async function getLastSyncCursor(): Promise<string | null> {
-  const userId = getCurrentDatabaseUserId();
-  return userId ? getMetadata(`last_sync_cursor:${userId}`) : null;
+  const scopeId = getCurrentDatabaseUserId();
+  return scopeId ? getMetadata(`last_sync_cursor:${scopeId}`) : null;
 }
 
 async function setLastSyncCursor(value: string): Promise<void> {
-  const userId = getCurrentDatabaseUserId();
+  const scopeId = getCurrentDatabaseUserId();
 
-  if (!userId) {
+  if (!scopeId) {
     return;
   }
 
-  await setMetadata(`last_sync_cursor:${userId}`, value);
+  await setMetadata(`last_sync_cursor:${scopeId}`, value);
 }
 
 async function getPendingCount(): Promise<number> {
@@ -215,13 +218,23 @@ async function buildRemoteRecord(
   payload: LocalRow,
   deviceId: string,
 ): Promise<RemoteRow> {
-  const userId = toStringValue(payload.user_id);
+  const householdId = toStringValue(payload.user_id);
+  const authenticatedUserId = getCurrentAuthenticatedUserId();
+
+  if (!authenticatedUserId) {
+    throw new Error('No authenticated Supabase user available for sync.');
+  }
 
   if (tableName === 'accounts') {
     return {
       sync_id: String(payload.sync_id),
-      user_id: userId,
+      user_id: authenticatedUserId,
+      household_id: householdId,
       device_id: deviceId,
+      owner_person_sync_id: await getRelatedSyncId(
+        'people',
+        payload.owner_person_id as number | null,
+      ),
       name: String(payload.name),
       type: String(payload.type),
       balance: Number(payload.balance),
@@ -236,10 +249,28 @@ async function buildRemoteRecord(
     };
   }
 
+  if (tableName === 'people') {
+    return {
+      sync_id: String(payload.sync_id),
+      user_id: authenticatedUserId,
+      household_id: householdId,
+      device_id: deviceId,
+      auth_user_id: (payload.auth_user_id as string | null) ?? null,
+      name: String(payload.name),
+      color: (payload.color as string | null) ?? null,
+      is_active: toBoolean(payload.is_active),
+      created_at: String(payload.created_at),
+      updated_at: String(payload.updated_at),
+      is_deleted: false,
+      deleted_at: null,
+    };
+  }
+
   if (tableName === 'categories') {
     return {
       sync_id: String(payload.sync_id),
-      user_id: userId,
+      user_id: authenticatedUserId,
+      household_id: householdId,
       device_id: deviceId,
       name: String(payload.name),
       type: String(payload.type),
@@ -256,7 +287,8 @@ async function buildRemoteRecord(
   if (tableName === 'subcategories') {
     return {
       sync_id: String(payload.sync_id),
-      user_id: userId,
+      user_id: authenticatedUserId,
+      household_id: householdId,
       device_id: deviceId,
       category_sync_id: await getRelatedSyncId(
         'categories',
@@ -275,7 +307,8 @@ async function buildRemoteRecord(
   if (tableName === 'transactions') {
     return {
       sync_id: String(payload.sync_id),
-      user_id: userId,
+      user_id: authenticatedUserId,
+      household_id: householdId,
       device_id: deviceId,
       account_sync_id: await getRelatedSyncId(
         'accounts',
@@ -285,6 +318,19 @@ async function buildRemoteRecord(
         'accounts',
         payload.destination_account_id as number | null,
       ),
+      person_sync_id: await getRelatedSyncId(
+        'people',
+        payload.person_id as number | null,
+      ),
+      installment_group_id: (payload.installment_group_id as string | null) ?? null,
+      installment_index:
+        typeof payload.installment_index === 'number'
+          ? payload.installment_index
+          : null,
+      installment_count:
+        typeof payload.installment_count === 'number'
+          ? payload.installment_count
+          : null,
       category_sync_id: await getRelatedSyncId(
         'categories',
         payload.category_id as number | null,
@@ -309,7 +355,8 @@ async function buildRemoteRecord(
   if (tableName === 'planning') {
     return {
       sync_id: String(payload.sync_id),
-      user_id: userId,
+      user_id: authenticatedUserId,
+      household_id: householdId,
       device_id: deviceId,
       year: Number(payload.year),
       month: Number(payload.month),
@@ -332,7 +379,8 @@ async function buildRemoteRecord(
 
   return {
     sync_id: String(payload.sync_id),
-    user_id: userId,
+    user_id: authenticatedUserId,
+    household_id: householdId,
     device_id: deviceId,
     essential_percentage: Number(payload.essential_percentage),
     non_essential_percentage: Number(payload.non_essential_percentage),
@@ -415,12 +463,18 @@ async function deleteLocalBySyncId(
 }
 
 async function upsertAccount(row: RemoteSyncRow, syncedAt: string): Promise<void> {
+  const localScopeId = toStringValue(row.household_id ?? row.user_id);
+  const ownerPersonId = await resolveLocalId(
+    'people',
+    row.owner_person_sync_id as string | null,
+  );
   const db = await getDatabase();
   await db.runAsync(
     `
       INSERT INTO accounts (
         sync_id,
         user_id,
+        owner_person_id,
         name,
         type,
         balance,
@@ -432,9 +486,10 @@ async function upsertAccount(row: RemoteSyncRow, syncedAt: string): Promise<void
         updated_at,
         last_synced_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(sync_id) DO UPDATE SET
         user_id = excluded.user_id,
+        owner_person_id = excluded.owner_person_id,
         name = excluded.name,
         type = excluded.type,
         balance = excluded.balance,
@@ -448,7 +503,8 @@ async function upsertAccount(row: RemoteSyncRow, syncedAt: string): Promise<void
     `,
     [
       row.sync_id,
-      toStringValue(row.user_id),
+      localScopeId,
+      ownerPersonId,
       toStringValue(row.name),
       toStringValue(row.type),
       toNumberValue(row.balance),
@@ -463,7 +519,49 @@ async function upsertAccount(row: RemoteSyncRow, syncedAt: string): Promise<void
   );
 }
 
+async function upsertPerson(row: RemoteSyncRow, syncedAt: string): Promise<void> {
+  const localScopeId = toStringValue(row.household_id ?? row.user_id);
+  const db = await getDatabase();
+  await db.runAsync(
+    `
+      INSERT INTO people (
+        sync_id,
+        user_id,
+        auth_user_id,
+        name,
+        color,
+        is_active,
+        created_at,
+        updated_at,
+        last_synced_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(sync_id) DO UPDATE SET
+        user_id = excluded.user_id,
+        auth_user_id = excluded.auth_user_id,
+        name = excluded.name,
+        color = excluded.color,
+        is_active = excluded.is_active,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        last_synced_at = excluded.last_synced_at
+    `,
+    [
+      row.sync_id,
+      localScopeId,
+      toNullableString(row.auth_user_id),
+      toStringValue(row.name),
+      toNullableString(row.color),
+      row.is_active ? 1 : 0,
+      toStringValue(row.created_at),
+      toStringValue(row.updated_at),
+      syncedAt,
+    ],
+  );
+}
+
 async function upsertCategory(row: RemoteSyncRow, syncedAt: string): Promise<void> {
+  const localScopeId = toStringValue(row.household_id ?? row.user_id);
   const db = await getDatabase();
   await db.runAsync(
     `
@@ -493,7 +591,7 @@ async function upsertCategory(row: RemoteSyncRow, syncedAt: string): Promise<voi
     `,
     [
       row.sync_id,
-      toStringValue(row.user_id),
+      localScopeId,
       toStringValue(row.name),
       toStringValue(row.type),
       toNullableString(row.color),
@@ -510,6 +608,7 @@ async function upsertSubcategory(
   row: RemoteSyncRow,
   syncedAt: string,
 ): Promise<boolean> {
+  const localScopeId = toStringValue(row.household_id ?? row.user_id);
   const categoryId = await resolveLocalId(
     'categories',
     row.category_sync_id as string | null,
@@ -546,7 +645,7 @@ async function upsertSubcategory(
     `,
     [
       row.sync_id,
-      toStringValue(row.user_id),
+      localScopeId,
       categoryId,
       toStringValue(row.name),
       toNullableString(row.color),
@@ -564,6 +663,7 @@ async function upsertTransaction(
   row: RemoteSyncRow,
   syncedAt: string,
 ): Promise<boolean> {
+  const localScopeId = toStringValue(row.household_id ?? row.user_id);
   const accountId = await resolveLocalId(
     'accounts',
     row.account_sync_id as string | null,
@@ -576,6 +676,10 @@ async function upsertTransaction(
   const destinationAccountId = await resolveLocalId(
     'accounts',
     row.destination_account_sync_id as string | null,
+  );
+  const personId = await resolveLocalId(
+    'people',
+    row.person_sync_id as string | null,
   );
   const categoryId = await resolveLocalId(
     'categories',
@@ -594,6 +698,10 @@ async function upsertTransaction(
         user_id,
         account_id,
         destination_account_id,
+        person_id,
+        installment_group_id,
+        installment_index,
+        installment_count,
         category_id,
         subcategory_id,
         type,
@@ -606,11 +714,15 @@ async function upsertTransaction(
         updated_at,
         last_synced_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(sync_id) DO UPDATE SET
         user_id = excluded.user_id,
         account_id = excluded.account_id,
         destination_account_id = excluded.destination_account_id,
+        person_id = excluded.person_id,
+        installment_group_id = excluded.installment_group_id,
+        installment_index = excluded.installment_index,
+        installment_count = excluded.installment_count,
         category_id = excluded.category_id,
         subcategory_id = excluded.subcategory_id,
         type = excluded.type,
@@ -625,9 +737,13 @@ async function upsertTransaction(
     `,
     [
       row.sync_id,
-      toStringValue(row.user_id),
+      localScopeId,
       accountId,
       destinationAccountId,
+      personId,
+      toNullableString(row.installment_group_id),
+      row.installment_index ? toNumberValue(row.installment_index) : null,
+      row.installment_count ? toNumberValue(row.installment_count) : null,
       categoryId,
       subcategoryId,
       toStringValue(row.type),
@@ -649,6 +765,7 @@ async function upsertPlanning(
   row: RemoteSyncRow,
   syncedAt: string,
 ): Promise<boolean> {
+  const localScopeId = toStringValue(row.household_id ?? row.user_id);
   const categoryId = await resolveLocalId(
     'categories',
     row.category_sync_id as string | null,
@@ -694,7 +811,7 @@ async function upsertPlanning(
     `,
     [
       row.sync_id,
-      toStringValue(row.user_id),
+      localScopeId,
       toNumberValue(row.year),
       toNumberValue(row.month),
       categoryId,
@@ -714,6 +831,7 @@ async function upsertPlanningSettings(
   row: RemoteSyncRow,
   syncedAt: string,
 ): Promise<void> {
+  const localScopeId = toStringValue(row.household_id ?? row.user_id);
   const db = await getDatabase();
   await db.runAsync(
     `
@@ -739,7 +857,7 @@ async function upsertPlanningSettings(
     `,
     [
       row.sync_id,
-      toStringValue(row.user_id),
+      localScopeId,
       toNumberValue(row.essential_percentage),
       toNumberValue(row.non_essential_percentage),
       toNumberValue(row.savings_percentage),
@@ -762,6 +880,11 @@ async function applyRemoteRow(
 
   if (tableName === 'accounts') {
     await upsertAccount(row, syncedAt);
+    return true;
+  }
+
+  if (tableName === 'people') {
+    await upsertPerson(row, syncedAt);
     return true;
   }
 

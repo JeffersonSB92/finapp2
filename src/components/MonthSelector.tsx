@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import {
+  FlatList,
+  ListRenderItemInfo,
   Pressable,
   StyleSheet,
   Text,
@@ -21,6 +23,10 @@ interface MonthSelectorProps {
   onSelectMonth: (date: Date) => void;
 }
 
+const ITEM_HEIGHT = 58;
+const ITEM_SPACING = 8;
+const ITEM_FULL_HEIGHT = ITEM_HEIGHT + ITEM_SPACING;
+
 function formatMonthLabel(date: Date): string {
   return new Intl.DateTimeFormat('pt-BR', {
     month: 'long',
@@ -37,12 +43,13 @@ export function MonthSelector({
   selectedDate,
 }: MonthSelectorProps): React.JSX.Element {
   const [visible, setVisible] = useState(false);
+  const listRef = useRef<FlatList<MonthSelectorOption> | null>(null);
 
   const options = useMemo<MonthSelectorOption[]>(() => {
     const currentMonth = getCurrentMonthDate();
     const items: MonthSelectorOption[] = [];
 
-    for (let offset = 12; offset >= -24; offset -= 1) {
+    for (let offset = -24; offset <= 24; offset += 1) {
       const monthDate = shiftMonth(currentMonth, offset);
       items.push({
         label: formatMonthLabel(monthDate),
@@ -54,6 +61,62 @@ export function MonthSelector({
   }, []);
 
   const selectedMonthKey = getMonthKey(selectedDate);
+  const currentMonthKey = getMonthKey(getCurrentMonthDate());
+  const currentMonthIndex = options.findIndex(
+    (option) => getMonthKey(option.value) === currentMonthKey,
+  );
+
+  function scrollToCurrentMonth(): void {
+    if (currentMonthIndex < 0) {
+      return;
+    }
+
+    listRef.current?.scrollToIndex({
+      animated: false,
+      index: currentMonthIndex,
+      viewPosition: 0,
+    });
+  }
+
+  useEffect(() => {
+    if (!visible || currentMonthIndex < 0) {
+      return;
+    }
+
+    const timeoutId = setTimeout(scrollToCurrentMonth, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [currentMonthIndex, visible]);
+
+  function renderOption({
+    item: option,
+  }: ListRenderItemInfo<MonthSelectorOption>): React.JSX.Element {
+    const isSelected = getMonthKey(option.value) === selectedMonthKey;
+
+    return (
+      <Pressable
+        onPress={() => {
+          onSelectMonth(option.value);
+          setVisible(false);
+        }}
+        style={[
+          styles.option,
+          isSelected ? styles.optionSelected : null,
+        ]}
+      >
+        <Text
+          style={[
+            styles.optionText,
+            isSelected ? styles.optionTextSelected : null,
+          ]}
+        >
+          {option.label}
+        </Text>
+      </Pressable>
+    );
+  }
 
   return (
     <View>
@@ -70,36 +133,32 @@ export function MonthSelector({
       </Pressable>
 
       <AppModalSheet
+        disableScrollWrap
         onClose={() => setVisible(false)}
         title="Selecionar mês"
         visible={visible}
       >
-        {options.map((option) => {
-          const isSelected = getMonthKey(option.value) === selectedMonthKey;
-
-          return (
-            <Pressable
-              key={getMonthKey(option.value)}
-              onPress={() => {
-                onSelectMonth(option.value);
-                setVisible(false);
-              }}
-              style={[
-                styles.option,
-                isSelected ? styles.optionSelected : null,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.optionText,
-                  isSelected ? styles.optionTextSelected : null,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        <FlatList
+          data={options}
+          contentContainerStyle={styles.listContent}
+          getItemLayout={(_, index) => ({
+            index,
+            length: ITEM_FULL_HEIGHT,
+            offset: ITEM_FULL_HEIGHT * index,
+          })}
+          keyExtractor={(item) => getMonthKey(item.value)}
+          onLayout={scrollToCurrentMonth}
+          onContentSizeChange={() => {
+            scrollToCurrentMonth();
+          }}
+          onScrollToIndexFailed={() => {
+            setTimeout(scrollToCurrentMonth, 50);
+          }}
+          ref={listRef}
+          renderItem={renderOption}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
       </AppModalSheet>
     </View>
   );
@@ -132,12 +191,20 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   option: {
+    alignItems: 'flex-start',
     backgroundColor: theme.colors.background.surface,
     borderColor: theme.colors.border.soft,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
+    height: ITEM_HEIGHT,
+    justifyContent: 'center',
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
+  },
+  listContent: {
+    paddingBottom: theme.spacing.xl,
+  },
+  separator: {
+    height: theme.spacing.sm,
   },
   optionSelected: {
     backgroundColor: theme.colors.brand.primarySoft,

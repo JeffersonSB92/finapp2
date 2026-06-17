@@ -31,126 +31,153 @@ create table if not exists public.household_invites (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
-create table if not exists public.people (
-  sync_id text primary key,
-  household_id uuid not null references public.households(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  device_id text,
-  auth_user_id uuid references auth.users(id) on delete set null,
-  name text not null,
-  color text,
-  is_active boolean not null default true,
-  is_deleted boolean not null default false,
-  deleted_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+alter table public.people add column if not exists household_id uuid;
+alter table public.people add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
+alter table public.accounts add column if not exists household_id uuid;
+alter table public.categories add column if not exists household_id uuid;
+alter table public.subcategories add column if not exists household_id uuid;
+alter table public.transactions add column if not exists household_id uuid;
+alter table public.transactions add column if not exists installment_group_id text;
+alter table public.transactions add column if not exists installment_index integer;
+alter table public.transactions add column if not exists installment_count integer;
+alter table public.planning add column if not exists household_id uuid;
+alter table public.planning_settings add column if not exists household_id uuid;
+
+with existing_users as (
+  select distinct user_id from public.people where user_id is not null
+  union
+  select distinct user_id from public.accounts where user_id is not null
+  union
+  select distinct user_id from public.categories where user_id is not null
+  union
+  select distinct user_id from public.subcategories where user_id is not null
+  union
+  select distinct user_id from public.transactions where user_id is not null
+  union
+  select distinct user_id from public.planning where user_id is not null
+  union
+  select distinct user_id from public.planning_settings where user_id is not null
+)
+insert into public.households (owner_user_id, name)
+select eu.user_id, 'Espaco principal'
+from existing_users eu
+where not exists (
+  select 1 from public.households h where h.owner_user_id = eu.user_id
 );
 
-create table if not exists public.accounts (
-  sync_id text primary key,
-  household_id uuid not null references public.households(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  device_id text,
-  owner_person_sync_id text references public.people(sync_id) on delete restrict,
-  name text not null,
-  type text not null,
-  balance numeric not null default 0,
-  currency text not null default 'BRL',
-  color text,
-  icon text,
-  is_active boolean not null default true,
-  is_deleted boolean not null default false,
-  deleted_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+insert into public.household_members (
+  household_id,
+  user_id,
+  role,
+  invited_by_user_id,
+  accepted_at
+)
+select h.id, h.owner_user_id, 'owner', h.owner_user_id, timezone('utc', now())
+from public.households h
+where not exists (
+  select 1
+  from public.household_members hm
+  where hm.household_id = h.id and hm.user_id = h.owner_user_id
 );
 
-create table if not exists public.categories (
-  sync_id text primary key,
-  household_id uuid not null references public.households(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  device_id text,
-  name text not null,
-  type text not null,
-  color text,
-  icon text,
-  is_system boolean not null default false,
-  is_deleted boolean not null default false,
-  deleted_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
+update public.people p
+set household_id = h.id
+from public.households h
+where p.household_id is null
+  and p.user_id = h.owner_user_id;
 
-create table if not exists public.subcategories (
-  sync_id text primary key,
-  household_id uuid not null references public.households(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  device_id text,
-  category_sync_id text not null references public.categories(sync_id) on delete cascade,
-  name text not null,
-  color text,
-  icon text,
-  is_deleted boolean not null default false,
-  deleted_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
+update public.people
+set auth_user_id = user_id
+where auth_user_id is null
+  and user_id is not null;
 
-create table if not exists public.transactions (
-  sync_id text primary key,
-  household_id uuid not null references public.households(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  device_id text,
-  account_sync_id text not null references public.accounts(sync_id) on delete restrict,
-  destination_account_sync_id text references public.accounts(sync_id) on delete restrict,
-  person_sync_id text references public.people(sync_id) on delete restrict,
-  installment_group_id text,
-  installment_index integer,
-  installment_count integer,
-  category_sync_id text references public.categories(sync_id) on delete set null,
-  subcategory_sync_id text references public.subcategories(sync_id) on delete set null,
-  type text not null,
-  amount numeric not null,
-  description text,
-  notes text,
-  is_paid boolean not null default true,
-  transaction_date timestamptz not null,
-  is_deleted boolean not null default false,
-  deleted_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
+update public.accounts a
+set household_id = h.id
+from public.households h
+where a.household_id is null
+  and a.user_id = h.owner_user_id;
 
-create table if not exists public.planning (
-  sync_id text primary key,
-  household_id uuid not null references public.households(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  device_id text,
-  year integer not null,
-  month integer not null check (month between 1 and 12),
-  category_sync_id text not null references public.categories(sync_id) on delete cascade,
-  subcategory_sync_id text references public.subcategories(sync_id) on delete set null,
-  planned_amount numeric not null,
-  notes text,
-  is_deleted boolean not null default false,
-  deleted_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
+update public.categories c
+set household_id = h.id
+from public.households h
+where c.household_id is null
+  and c.user_id = h.owner_user_id;
 
-create table if not exists public.planning_settings (
-  sync_id text primary key,
-  household_id uuid not null references public.households(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  device_id text,
-  essential_percentage numeric not null,
-  non_essential_percentage numeric not null,
-  savings_percentage numeric not null,
-  is_deleted boolean not null default false,
-  deleted_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
+update public.subcategories s
+set household_id = h.id
+from public.households h
+where s.household_id is null
+  and s.user_id = h.owner_user_id;
+
+update public.transactions t
+set household_id = h.id
+from public.households h
+where t.household_id is null
+  and t.user_id = h.owner_user_id;
+
+update public.planning p
+set household_id = h.id
+from public.households h
+where p.household_id is null
+  and p.user_id = h.owner_user_id;
+
+update public.planning_settings ps
+set household_id = h.id
+from public.households h
+where ps.household_id is null
+  and ps.user_id = h.owner_user_id;
+
+alter table public.people
+  alter column household_id set not null;
+alter table public.accounts
+  alter column household_id set not null;
+alter table public.categories
+  alter column household_id set not null;
+alter table public.subcategories
+  alter column household_id set not null;
+alter table public.transactions
+  alter column household_id set not null;
+alter table public.planning
+  alter column household_id set not null;
+alter table public.planning_settings
+  alter column household_id set not null;
+
+alter table public.people
+  drop constraint if exists people_household_id_fkey;
+alter table public.accounts
+  drop constraint if exists accounts_household_id_fkey;
+alter table public.categories
+  drop constraint if exists categories_household_id_fkey;
+alter table public.subcategories
+  drop constraint if exists subcategories_household_id_fkey;
+alter table public.transactions
+  drop constraint if exists transactions_household_id_fkey;
+alter table public.planning
+  drop constraint if exists planning_household_id_fkey;
+alter table public.planning_settings
+  drop constraint if exists planning_settings_household_id_fkey;
+
+alter table public.people
+  add constraint people_household_id_fkey
+  foreign key (household_id) references public.households(id) on delete cascade;
+alter table public.accounts
+  add constraint accounts_household_id_fkey
+  foreign key (household_id) references public.households(id) on delete cascade;
+alter table public.categories
+  add constraint categories_household_id_fkey
+  foreign key (household_id) references public.households(id) on delete cascade;
+alter table public.subcategories
+  add constraint subcategories_household_id_fkey
+  foreign key (household_id) references public.households(id) on delete cascade;
+alter table public.transactions
+  add constraint transactions_household_id_fkey
+  foreign key (household_id) references public.households(id) on delete cascade;
+alter table public.planning
+  add constraint planning_household_id_fkey
+  foreign key (household_id) references public.households(id) on delete cascade;
+alter table public.planning_settings
+  add constraint planning_settings_household_id_fkey
+  foreign key (household_id) references public.households(id) on delete cascade;
 
 create index if not exists idx_households_owner_user_id on public.households (owner_user_id);
 create index if not exists idx_household_members_household_id on public.household_members (household_id);
@@ -158,30 +185,14 @@ create index if not exists idx_household_members_user_id on public.household_mem
 create index if not exists idx_household_invites_household_id on public.household_invites (household_id);
 create index if not exists idx_household_invites_token on public.household_invites (token);
 create index if not exists idx_people_household_id on public.people (household_id);
-create index if not exists idx_people_user_id on public.people (user_id);
 create index if not exists idx_people_auth_user_id on public.people (auth_user_id);
-create index if not exists idx_people_updated_at on public.people (updated_at);
 create index if not exists idx_accounts_household_id on public.accounts (household_id);
-create index if not exists idx_accounts_user_id on public.accounts (user_id);
-create index if not exists idx_accounts_updated_at on public.accounts (updated_at);
-create index if not exists idx_accounts_owner_person_sync_id on public.accounts (owner_person_sync_id);
 create index if not exists idx_categories_household_id on public.categories (household_id);
-create index if not exists idx_categories_user_id on public.categories (user_id);
-create index if not exists idx_categories_updated_at on public.categories (updated_at);
 create index if not exists idx_subcategories_household_id on public.subcategories (household_id);
-create index if not exists idx_subcategories_user_id on public.subcategories (user_id);
-create index if not exists idx_subcategories_updated_at on public.subcategories (updated_at);
 create index if not exists idx_transactions_household_id on public.transactions (household_id);
-create index if not exists idx_transactions_user_id on public.transactions (user_id);
-create index if not exists idx_transactions_updated_at on public.transactions (updated_at);
-create index if not exists idx_transactions_person_sync_id on public.transactions (person_sync_id);
 create index if not exists idx_transactions_installment_group_id on public.transactions (installment_group_id);
 create index if not exists idx_planning_household_id on public.planning (household_id);
-create index if not exists idx_planning_user_id on public.planning (user_id);
-create index if not exists idx_planning_updated_at on public.planning (updated_at);
 create index if not exists idx_planning_settings_household_id on public.planning_settings (household_id);
-create index if not exists idx_planning_settings_user_id on public.planning_settings (user_id);
-create index if not exists idx_planning_settings_updated_at on public.planning_settings (updated_at);
 
 create or replace function public.is_household_member(p_household_id uuid)
 returns boolean
@@ -299,6 +310,35 @@ alter table public.transactions enable row level security;
 alter table public.planning enable row level security;
 alter table public.planning_settings enable row level security;
 
+drop policy if exists "people_select_own" on public.people;
+drop policy if exists "people_insert_own" on public.people;
+drop policy if exists "people_update_own" on public.people;
+drop policy if exists "people_delete_own" on public.people;
+drop policy if exists "accounts_select_own" on public.accounts;
+drop policy if exists "accounts_insert_own" on public.accounts;
+drop policy if exists "accounts_update_own" on public.accounts;
+drop policy if exists "accounts_delete_own" on public.accounts;
+drop policy if exists "categories_select_own" on public.categories;
+drop policy if exists "categories_insert_own" on public.categories;
+drop policy if exists "categories_update_own" on public.categories;
+drop policy if exists "categories_delete_own" on public.categories;
+drop policy if exists "subcategories_select_own" on public.subcategories;
+drop policy if exists "subcategories_insert_own" on public.subcategories;
+drop policy if exists "subcategories_update_own" on public.subcategories;
+drop policy if exists "subcategories_delete_own" on public.subcategories;
+drop policy if exists "transactions_select_own" on public.transactions;
+drop policy if exists "transactions_insert_own" on public.transactions;
+drop policy if exists "transactions_update_own" on public.transactions;
+drop policy if exists "transactions_delete_own" on public.transactions;
+drop policy if exists "planning_select_own" on public.planning;
+drop policy if exists "planning_insert_own" on public.planning;
+drop policy if exists "planning_update_own" on public.planning;
+drop policy if exists "planning_delete_own" on public.planning;
+drop policy if exists "planning_settings_select_own" on public.planning_settings;
+drop policy if exists "planning_settings_insert_own" on public.planning_settings;
+drop policy if exists "planning_settings_update_own" on public.planning_settings;
+drop policy if exists "planning_settings_delete_own" on public.planning_settings;
+
 drop policy if exists "households_select_member" on public.households;
 drop policy if exists "households_insert_owner" on public.households;
 drop policy if exists "households_update_owner" on public.households;
@@ -353,10 +393,6 @@ create policy "household_invites_delete_owner" on public.household_invites
 for delete to authenticated
 using (public.is_household_owner(household_id));
 
-drop policy if exists "people_select_member" on public.people;
-drop policy if exists "people_insert_member" on public.people;
-drop policy if exists "people_update_member" on public.people;
-drop policy if exists "people_delete_member" on public.people;
 create policy "people_select_member" on public.people
 for select to authenticated
 using (public.is_household_member(household_id));
@@ -371,10 +407,6 @@ create policy "people_delete_member" on public.people
 for delete to authenticated
 using (public.is_household_member(household_id));
 
-drop policy if exists "accounts_select_member" on public.accounts;
-drop policy if exists "accounts_insert_member" on public.accounts;
-drop policy if exists "accounts_update_member" on public.accounts;
-drop policy if exists "accounts_delete_member" on public.accounts;
 create policy "accounts_select_member" on public.accounts
 for select to authenticated
 using (public.is_household_member(household_id));
@@ -389,10 +421,6 @@ create policy "accounts_delete_member" on public.accounts
 for delete to authenticated
 using (public.is_household_member(household_id));
 
-drop policy if exists "categories_select_member" on public.categories;
-drop policy if exists "categories_insert_member" on public.categories;
-drop policy if exists "categories_update_member" on public.categories;
-drop policy if exists "categories_delete_member" on public.categories;
 create policy "categories_select_member" on public.categories
 for select to authenticated
 using (public.is_household_member(household_id));
@@ -407,10 +435,6 @@ create policy "categories_delete_member" on public.categories
 for delete to authenticated
 using (public.is_household_member(household_id));
 
-drop policy if exists "subcategories_select_member" on public.subcategories;
-drop policy if exists "subcategories_insert_member" on public.subcategories;
-drop policy if exists "subcategories_update_member" on public.subcategories;
-drop policy if exists "subcategories_delete_member" on public.subcategories;
 create policy "subcategories_select_member" on public.subcategories
 for select to authenticated
 using (public.is_household_member(household_id));
@@ -425,10 +449,6 @@ create policy "subcategories_delete_member" on public.subcategories
 for delete to authenticated
 using (public.is_household_member(household_id));
 
-drop policy if exists "transactions_select_member" on public.transactions;
-drop policy if exists "transactions_insert_member" on public.transactions;
-drop policy if exists "transactions_update_member" on public.transactions;
-drop policy if exists "transactions_delete_member" on public.transactions;
 create policy "transactions_select_member" on public.transactions
 for select to authenticated
 using (public.is_household_member(household_id));
@@ -443,10 +463,6 @@ create policy "transactions_delete_member" on public.transactions
 for delete to authenticated
 using (public.is_household_member(household_id));
 
-drop policy if exists "planning_select_member" on public.planning;
-drop policy if exists "planning_insert_member" on public.planning;
-drop policy if exists "planning_update_member" on public.planning;
-drop policy if exists "planning_delete_member" on public.planning;
 create policy "planning_select_member" on public.planning
 for select to authenticated
 using (public.is_household_member(household_id));
@@ -461,10 +477,6 @@ create policy "planning_delete_member" on public.planning
 for delete to authenticated
 using (public.is_household_member(household_id));
 
-drop policy if exists "planning_settings_select_member" on public.planning_settings;
-drop policy if exists "planning_settings_insert_member" on public.planning_settings;
-drop policy if exists "planning_settings_update_member" on public.planning_settings;
-drop policy if exists "planning_settings_delete_member" on public.planning_settings;
 create policy "planning_settings_select_member" on public.planning_settings
 for select to authenticated
 using (public.is_household_member(household_id));

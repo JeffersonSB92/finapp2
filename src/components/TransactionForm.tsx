@@ -19,6 +19,7 @@ export function TransactionForm({
     submitError,
     isEditing,
     accountOptions,
+    personOptions,
     categoryOptions,
     subcategoryOptions,
     statusOptions,
@@ -63,6 +64,28 @@ export function TransactionForm({
         options={typeOptions}
         selectedValue={values.type}
       />
+
+      <ModalSelector
+        error={errors.personId}
+        label="Pessoa responsável"
+        onSelect={(personId) => setField('personId', personId)}
+        options={personOptions}
+        placeholder="Selecione uma pessoa"
+        selectedValue={values.personId}
+      />
+
+      {values.type === 'expense' ? (
+        <FormField
+          error={errors.installmentCount}
+          keyboardType="numeric"
+          label="Parcelas"
+          onChangeText={(installmentCount) =>
+            setField('installmentCount', installmentCount)
+          }
+          placeholder="1"
+          value={values.installmentCount}
+        />
+      ) : null}
 
       <ModalSelector
         error={errors.categoryId}

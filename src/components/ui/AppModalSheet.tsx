@@ -15,10 +15,12 @@ interface AppModalSheetProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  disableScrollWrap?: boolean;
 }
 
 export function AppModalSheet({
   children,
+  disableScrollWrap = false,
   onClose,
   title,
   visible,
@@ -34,9 +36,13 @@ export function AppModalSheet({
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          {disableScrollWrap ? (
             <View style={styles.content}>{children}</View>
-          </ScrollView>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.content}>{children}</View>
+            </ScrollView>
+          )}
         </View>
       </View>
     </Modal>
@@ -56,7 +62,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: theme.radii.xl,
     borderWidth: theme.borders.width.thin,
     maxHeight: '72%',
-    padding: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.bottomSafe,
   },
   header: {
     alignItems: 'center',
@@ -82,6 +90,6 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: theme.spacing.sm,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: theme.spacing.bottomSafe,
   },
 });

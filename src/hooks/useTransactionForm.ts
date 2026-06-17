@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { TransactionType } from '../database';
 import { useFinanceStore } from '../store';
+import { useAuthStore } from '../store/authStore';
 import {
   formatDateInput,
   formatIsoDateInput,
@@ -19,6 +20,8 @@ interface TransactionFormValues {
   title: string;
   amount: string;
   type: TransactionType;
+  personId: number | null;
+  installmentCount: string;
   categoryId: number | null;
   subcategoryId: number | null;
   accountId: number | null;
@@ -30,6 +33,8 @@ interface TransactionFormErrors {
   title?: string;
   amount?: string;
   type?: string;
+  personId?: string;
+  installmentCount?: string;
   categoryId?: string;
   subcategoryId?: string;
   accountId?: string;
@@ -54,6 +59,7 @@ export interface UseTransactionFormResult {
   submitError: string | null;
   isEditing: boolean;
   accountOptions: TransactionFormOption[];
+  personOptions: TransactionFormOption[];
   categoryOptions: TransactionFormOption[];
   subcategoryOptions: TransactionFormOption[];
   statusOptions: TransactionStatusOption[];
@@ -102,7 +108,10 @@ function isValidDateInput(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(value).getTime());
 }
 
-function validate(values: TransactionFormValues): TransactionFormErrors {
+function validate(
+  values: TransactionFormValues,
+  requiresPerson: boolean,
+): TransactionFormErrors {
   const errors: TransactionFormErrors = {};
 
   if (!values.title.trim()) {
@@ -115,6 +124,22 @@ function validate(values: TransactionFormValues): TransactionFormErrors {
 
   if (!values.type) {
     errors.type = 'Selecione o tipo.';
+  }
+
+  if (requiresPerson && values.personId === null) {
+    errors.personId = 'Selecione a pessoa responsável.';
+  }
+
+  if (values.type === TransactionType.EXPENSE) {
+    const installmentCount = Number(values.installmentCount);
+
+    if (
+      !Number.isInteger(installmentCount) ||
+      installmentCount < 1 ||
+      installmentCount > 36
+    ) {
+      errors.installmentCount = 'Informe de 1 a 36 parcelas.';
+    }
   }
 
   if (values.categoryId === null) {
@@ -142,17 +167,21 @@ export function useTransactionForm({
 }: TransactionFormProps): UseTransactionFormResult {
   const initialize = useFinanceStore((state) => state.initialize);
   const accounts = useFinanceStore((state) => state.accounts);
+  const people = useFinanceStore((state) => state.people);
   const categories = useFinanceStore((state) => state.categories);
   const subcategories = useFinanceStore((state) => state.subcategories);
   const transactions = useFinanceStore((state) => state.transactions);
   const addTransaction = useFinanceStore((state) => state.addTransaction);
   const updateTransaction = useFinanceStore((state) => state.updateTransaction);
   const storeError = useFinanceStore((state) => state.error);
+  const session = useAuthStore((state) => state.session);
 
   const [values, setValues] = useState<TransactionFormValues>({
     title: '',
     amount: '',
     type: TransactionType.EXPENSE,
+    personId: null,
+    installmentCount: '1',
     categoryId: null,
     subcategoryId: null,
     accountId: null,
@@ -182,6 +211,8 @@ export function useTransactionForm({
       title: transaction.description ?? '',
       amount: formatCurrencyInput(String(Math.round(transaction.amount * 100))),
       type: transaction.type === TransactionType.TRANSFER ? TransactionType.EXPENSE : transaction.type,
+      personId: transaction.person_id,
+      installmentCount: String(transaction.installment_count ?? 1),
       categoryId: transaction.category_id,
       subcategoryId: transaction.subcategory_id,
       accountId: transaction.account_id,
@@ -198,6 +229,42 @@ export function useTransactionForm({
       })),
     [accounts],
   );
+
+  const personOptions = useMemo(
+    () =>
+      people
+        .filter((person) => person.is_active)
+        .map((person) => ({
+          label: person.name,
+          value: person.id,
+        })),
+    [people],
+  );
+
+  const currentUserPersonId = useMemo(
+    () =>
+      people.find((person) => person.auth_user_id === session?.user.id)?.id ?? null,
+    [people, session?.user.id],
+  );
+
+  useEffect(() => {
+    if (transactionId) {
+      return;
+    }
+
+    if (currentUserPersonId === null) {
+      return;
+    }
+
+    setValues((current) =>
+      current.personId === null
+        ? {
+            ...current,
+            personId: currentUserPersonId,
+          }
+        : current,
+    );
+  }, [currentUserPersonId, transactionId]);
 
   const categoryOptions = useMemo(
     () =>
@@ -222,7 +289,7 @@ export function useTransactionForm({
   );
 
   async function submit(): Promise<void> {
-    const nextErrors = validate(values);
+    const nextErrors = validate(values, personOptions.length > 0);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -235,6 +302,11 @@ export function useTransactionForm({
     try {
       const payload = {
         account_id: values.accountId as number,
+        person_id: values.personId,
+        installment_count:
+          values.type === TransactionType.EXPENSE
+            ? Number(values.installmentCount)
+            : 1,
         category_id: values.categoryId,
         subcategory_id: values.subcategoryId,
         type: values.type,
@@ -302,6 +374,7 @@ export function useTransactionForm({
     submitError,
     isEditing: Boolean(transactionId),
     accountOptions,
+    personOptions,
     categoryOptions,
     subcategoryOptions,
     statusOptions,

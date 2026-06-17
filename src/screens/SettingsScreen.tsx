@@ -3,6 +3,7 @@ import { Feather } from '@expo/vector-icons';
 import {
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -33,6 +34,10 @@ interface PreferenceRowProps {
   value?: string;
   onPress?: () => void;
   tone?: 'default' | 'danger';
+}
+
+interface SettingsScreenProps {
+  onOpenPeople?: () => void;
 }
 
 function validate(values: SettingsFormValues): SettingsFormErrors {
@@ -122,12 +127,17 @@ function PreferenceRow({
   );
 }
 
-export function SettingsScreen(): React.JSX.Element {
+export function SettingsScreen({
+  onOpenPeople,
+}: SettingsScreenProps): React.JSX.Element {
   const profile = useAuthStore((state) => state.profile);
   const session = useAuthStore((state) => state.session);
+  const household = useAuthStore((state) => state.household);
   const updateProfile = useAuthStore((state) => state.updateProfile);
   const signOut = useAuthStore((state) => state.signOut);
+  const createInviteLink = useAuthStore((state) => state.createInviteLink);
   const isProfileSaving = useAuthStore((state) => state.isProfileSaving);
+  const isCreatingInvite = useAuthStore((state) => state.isCreatingInvite);
   const storeError = useAuthStore((state) => state.error);
 
   const [values, setValues] = useState<SettingsFormValues>(toFormValues(profile));
@@ -175,6 +185,23 @@ export function SettingsScreen(): React.JSX.Element {
       await signOut();
     } finally {
       setIsSigningOut(false);
+    }
+  }
+
+  async function handleShareInvite(): Promise<void> {
+    setSubmitError(null);
+    setSuccessMessage(null);
+
+    try {
+      const inviteLink = await createInviteLink();
+
+      await Share.share({
+        message: `Use este link para entrar no meu espaco financeiro no FinApp: ${inviteLink}`,
+      });
+
+      setSuccessMessage('Convite gerado. Compartilhe o link com a pessoa que vai entrar na sua conta compartilhada.');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : storeError);
     }
   }
 
@@ -264,6 +291,35 @@ export function SettingsScreen(): React.JSX.Element {
         />
       </AppCard>
 
+      <SectionTitle>Espaço compartilhado</SectionTitle>
+      <AppCard style={styles.sectionCard}>
+        <PreferenceRow
+          description={
+            household
+              ? `Você está usando o espaço "${household.name}". ${household.role === 'owner' ? 'Você é o proprietário e pode convidar outras pessoas.' : 'Você participa como membro convidado.'}`
+              : 'Ainda não foi possível identificar o espaço financeiro desta conta.'
+          }
+          icon="home"
+          title="Household ativo"
+          value={household ? household.role : 'Indefinido'}
+        />
+
+        {household?.role === 'owner' ? (
+          <AppButton
+            disabled={isCreatingInvite}
+            label="Gerar link de convite"
+            loading={isCreatingInvite}
+            onPress={() => {
+              void handleShareInvite();
+            }}
+          />
+        ) : (
+          <Text style={styles.memberHint}>
+            Somente o proprietário pode gerar novos links de convite.
+          </Text>
+        )}
+      </AppCard>
+
       <SectionTitle>Backup e dados</SectionTitle>
       <AppCard style={styles.preferenceCard}>
         <PreferenceRow
@@ -275,6 +331,13 @@ export function SettingsScreen(): React.JSX.Element {
           icon="database"
           title="Armazenamento"
           value={syncEnabled ? 'Sync habilitado' : 'Somente local'}
+        />
+        <PreferenceRow
+          description="Cadastre quem participa do controle financeiro para identificar titularidade das contas e responsabilidade das movimentações."
+          icon="users"
+          onPress={onOpenPeople}
+          title="Pessoas"
+          value="Gerenciar"
         />
       </AppCard>
 
@@ -363,6 +426,12 @@ const styles = StyleSheet.create({
   error: {
     color: theme.colors.status.error,
     fontFamily: theme.fonts.family.medium,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
+  },
+  memberHint: {
+    color: theme.colors.text.secondary,
+    fontFamily: theme.fonts.family.regular,
     fontSize: theme.fonts.size.sm,
     lineHeight: theme.fonts.lineHeight.sm,
   },

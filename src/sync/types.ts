@@ -1,6 +1,7 @@
 import type { ISODateString } from '../database';
 
 export type SyncTableName =
+  | 'people'
   | 'accounts'
   | 'categories'
   | 'subcategories'

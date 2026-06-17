@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { Account, Category, Transaction, TransactionType } from '../database';
+import {
+  Account,
+  Category,
+  Person,
+  Transaction,
+  TransactionType,
+} from '../database';
+import { getCurrentMonthDate, isSameLocalMonth } from '../utils/date';
 import { useFinanceStore } from '../store';
 import { getLocalDateKey, parseDateKey } from '../utils/date';
 
@@ -12,7 +19,9 @@ export interface TransactionListItemModel {
   title: string;
   value: string;
   rawValue: number;
+  person: string | null;
   account: string | null;
+  installmentLabel: string | null;
   category: string;
   type: TransactionType;
   status: TransactionPaymentStatus;
@@ -36,11 +45,16 @@ export interface UseTransactionListResult {
   sections: TransactionListSection[];
   isLoading: boolean;
   error: string | null;
+  referenceDate: Date;
   typeFilter: TransactionFilterType;
   categoryFilter: string;
+  personFilter: string;
   categoryOptions: TransactionCategoryFilter[];
+  personOptions: TransactionCategoryFilter[];
+  selectMonth: (value: Date) => void;
   setTypeFilter: (value: TransactionFilterType) => void;
   setCategoryFilter: (value: string) => void;
+  setPersonFilter: (value: string) => void;
   deleteTransaction: (id: number) => Promise<void>;
 }
 
@@ -58,6 +72,7 @@ function formatSectionTitle(date: Date): string {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
+    year: 'numeric',
   }).format(date);
 }
 
@@ -76,6 +91,10 @@ function buildAccountMap(accounts: Account[]): Map<number, Account> {
   return new Map(accounts.map((account) => [account.id, account]));
 }
 
+function buildPersonMap(people: Person[]): Map<number, Person> {
+  return new Map(people.map((person) => [person.id, person]));
+}
+
 function deriveStatus(transaction: Transaction): TransactionPaymentStatus {
   return transaction.is_paid ? 'paid' : 'pending';
 }
@@ -84,11 +103,13 @@ function buildItemModel(
   transaction: Transaction,
   categoriesById: Map<number, Category>,
   accountsById: Map<number, Account>,
+  peopleById: Map<number, Person>,
 ): TransactionListItemModel {
   const category = transaction.category_id
     ? categoriesById.get(transaction.category_id)
     : null;
   const account = accountsById.get(transaction.account_id);
+  const person = transaction.person_id ? peopleById.get(transaction.person_id) : null;
   const status = deriveStatus(transaction);
   const transactionDate = new Date(transaction.transaction_date);
 
@@ -97,7 +118,12 @@ function buildItemModel(
     title: transaction.description?.trim() || 'Transação sem título',
     value: formatCurrency(transaction.amount),
     rawValue: transaction.amount,
+    person: person?.name ?? null,
     account: account?.name ?? null,
+    installmentLabel:
+      transaction.installment_count && transaction.installment_count > 1
+        ? `${transaction.installment_index ?? 1}/${transaction.installment_count}`
+        : null,
     category:
       category?.name ??
       (transaction.type === TransactionType.TRANSFER ? 'Transferência' : 'Sem categoria'),
@@ -110,10 +136,13 @@ function buildItemModel(
 }
 
 export function useTransactionList(): UseTransactionListResult {
+  const [referenceDate, setReferenceDate] = useState<Date>(getCurrentMonthDate());
   const [typeFilter, setTypeFilter] = useState<TransactionFilterType>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [personFilter, setPersonFilter] = useState<string>('all');
 
   const accounts = useFinanceStore((state) => state.accounts);
+  const people = useFinanceStore((state) => state.people);
   const transactions = useFinanceStore((state) => state.transactions);
   const categories = useFinanceStore((state) => state.categories);
   const initialize = useFinanceStore((state) => state.initialize);
@@ -138,11 +167,29 @@ export function useTransactionList(): UseTransactionListResult {
     [categories],
   );
 
+  const personOptions = useMemo<TransactionCategoryFilter[]>(
+    () => [
+      { label: 'Todas', value: 'all' },
+      ...people
+        .filter((person) => person.is_active)
+        .map((person) => ({
+          label: person.name,
+          value: String(person.id),
+        })),
+    ],
+    [people],
+  );
+
   const sections = useMemo<TransactionListSection[]>(() => {
     const categoriesById = buildCategoryMap(categories);
     const accountsById = buildAccountMap(accounts);
+    const peopleById = buildPersonMap(people);
 
     const filteredTransactions = transactions.filter((transaction) => {
+      if (!isSameLocalMonth(transaction.transaction_date, referenceDate)) {
+        return false;
+      }
+
       if (typeFilter !== 'all' && transaction.type !== typeFilter) {
         return false;
       }
@@ -154,6 +201,10 @@ export function useTransactionList(): UseTransactionListResult {
         return false;
       }
 
+      if (personFilter !== 'all' && String(transaction.person_id ?? '') !== personFilter) {
+        return false;
+      }
+
       return true;
     });
 
@@ -161,7 +212,9 @@ export function useTransactionList(): UseTransactionListResult {
       (accumulator, transaction) => {
         const dateKey = getLocalDateKey(transaction.transaction_date);
         const currentItems = accumulator.get(dateKey) ?? [];
-        currentItems.push(buildItemModel(transaction, categoriesById, accountsById));
+        currentItems.push(
+          buildItemModel(transaction, categoriesById, accountsById, peopleById),
+        );
         accumulator.set(dateKey, currentItems);
         return accumulator;
       },
@@ -175,17 +228,31 @@ export function useTransactionList(): UseTransactionListResult {
         dateKey,
         data,
       }));
-  }, [accounts, categories, categoryFilter, transactions, typeFilter]);
+  }, [
+    accounts,
+    categories,
+    categoryFilter,
+    people,
+    personFilter,
+    referenceDate,
+    transactions,
+    typeFilter,
+  ]);
 
   return {
     sections,
     isLoading,
     error,
+    referenceDate,
     typeFilter,
     categoryFilter,
+    personFilter,
     categoryOptions,
+    personOptions,
+    selectMonth: setReferenceDate,
     setTypeFilter,
     setCategoryFilter,
+    setPersonFilter,
     deleteTransaction: removeTransaction,
   };
 }

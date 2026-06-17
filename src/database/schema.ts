@@ -8,6 +8,7 @@ export const CREATE_TABLES_STATEMENTS = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sync_id TEXT UNIQUE,
     user_id TEXT,
+    owner_person_id INTEGER,
     name TEXT NOT NULL,
     type TEXT NOT NULL,
     balance REAL NOT NULL DEFAULT 0,
@@ -17,7 +18,8 @@ export const CREATE_TABLES_STATEMENTS = `
     is_active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    last_synced_at TEXT
+    last_synced_at TEXT,
+    FOREIGN KEY (owner_person_id) REFERENCES people(id) ON DELETE RESTRICT
   );
 
   CREATE TABLE IF NOT EXISTS categories (
@@ -54,6 +56,10 @@ export const CREATE_TABLES_STATEMENTS = `
     user_id TEXT,
     account_id INTEGER NOT NULL,
     destination_account_id INTEGER,
+    person_id INTEGER,
+    installment_group_id TEXT,
+    installment_index INTEGER,
+    installment_count INTEGER,
     category_id INTEGER,
     subcategory_id INTEGER,
     type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'transfer')),
@@ -67,8 +73,22 @@ export const CREATE_TABLES_STATEMENTS = `
     last_synced_at TEXT,
     FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
     FOREIGN KEY (destination_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+    FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE RESTRICT,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
     FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS people (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_id TEXT UNIQUE,
+    user_id TEXT,
+    auth_user_id TEXT,
+    name TEXT NOT NULL,
+    color TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_synced_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS planning (
@@ -132,6 +152,9 @@ export const CREATE_INDEXES_STATEMENTS = `
   CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_sync_id
     ON transactions (sync_id);
 
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_people_sync_id
+    ON people (sync_id);
+
   CREATE UNIQUE INDEX IF NOT EXISTS idx_planning_sync_id
     ON planning (sync_id);
 
@@ -143,6 +166,9 @@ export const CREATE_INDEXES_STATEMENTS = `
 
   CREATE INDEX IF NOT EXISTS idx_accounts_user_id
     ON accounts (user_id);
+
+  CREATE INDEX IF NOT EXISTS idx_people_user_id
+    ON people (user_id);
 
   CREATE INDEX IF NOT EXISTS idx_categories_user_id
     ON categories (user_id);
@@ -162,8 +188,17 @@ export const CREATE_INDEXES_STATEMENTS = `
   CREATE INDEX IF NOT EXISTS idx_transactions_account_id
     ON transactions (account_id);
 
+  CREATE INDEX IF NOT EXISTS idx_accounts_owner_person_id
+    ON accounts (owner_person_id);
+
   CREATE INDEX IF NOT EXISTS idx_transactions_destination_account_id
     ON transactions (destination_account_id);
+
+  CREATE INDEX IF NOT EXISTS idx_transactions_person_id
+    ON transactions (person_id);
+
+  CREATE INDEX IF NOT EXISTS idx_transactions_installment_group_id
+    ON transactions (installment_group_id);
 
   CREATE INDEX IF NOT EXISTS idx_transactions_category_id
     ON transactions (category_id);

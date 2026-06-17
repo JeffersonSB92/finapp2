@@ -9,6 +9,7 @@ interface TransactionItemProps {
   item: TransactionListItemModel;
   onEdit?: (id: number) => void;
   onDelete?: (id: number) => void;
+  onPress?: (item: TransactionListItemModel) => void;
 }
 
 function getValueColor(type: TransactionListItemModel['type']): string {
@@ -65,6 +66,7 @@ export function TransactionItem({
   item,
   onDelete,
   onEdit,
+  onPress,
 }: TransactionItemProps): React.JSX.Element {
   const statusStyles = getStatusStyles(item.status);
   const indicator = getIndicator(item.type);
@@ -88,7 +90,7 @@ export function TransactionItem({
 
   return (
     <Swipeable overshootRight={false} renderRightActions={renderRightActions}>
-      <Pressable style={styles.container}>
+      <Pressable onPress={() => onPress?.(item)} style={styles.container}>
         <View style={styles.content}>
           <View
             style={[
@@ -103,11 +105,24 @@ export function TransactionItem({
             <Text numberOfLines={1} style={styles.title}>
               {item.title}
             </Text>
+            {item.installmentLabel ? (
+              <Text style={styles.installmentText}>
+                Parcela {item.installmentLabel}
+              </Text>
+            ) : null}
 
             <View style={styles.metaRow}>
               <Text numberOfLines={1} style={styles.metaText}>
                 {item.category}
               </Text>
+              {item.person ? (
+                <>
+                  <Text style={styles.separator}>•</Text>
+                  <Text numberOfLines={1} style={styles.metaText}>
+                    {item.person}
+                  </Text>
+                </>
+              ) : null}
               {item.account ? (
                 <>
                   <Text style={styles.separator}>•</Text>
@@ -179,6 +194,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.family.semibold,
     fontSize: theme.fonts.size.md,
     lineHeight: theme.fonts.lineHeight.md,
+  },
+  installmentText: {
+    color: theme.colors.brand.primary,
+    fontFamily: theme.fonts.family.medium,
+    fontSize: theme.fonts.size.xs,
+    lineHeight: theme.fonts.lineHeight.xs,
   },
   metaRow: {
     alignItems: 'center',
