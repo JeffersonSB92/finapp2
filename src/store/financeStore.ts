@@ -41,6 +41,7 @@ import type {
   UpdateTransactionInput,
 } from '../database/repositories/TransactionRepository';
 import { isSupabaseConfigured, syncService } from '../sync';
+import { useConnectivityStore } from './connectivityStore';
 import { storeRepositories } from './repositories';
 
 let financeInitializationPromise: Promise<void> | null = null;
@@ -282,6 +283,15 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   syncNow: async () => {
     if (!isSupabaseConfigured()) {
       await refreshPendingSyncCount(set);
+      return;
+    }
+
+    if (!useConnectivityStore.getState().isOnline) {
+      await refreshPendingSyncCount(set);
+      set({
+        isSyncing: false,
+        syncError: null,
+      });
       return;
     }
 

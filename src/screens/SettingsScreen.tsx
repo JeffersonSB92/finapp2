@@ -12,6 +12,7 @@ import {
 import { FormField } from '../components/form';
 import { AppButton, AppCard } from '../components/ui';
 import { isSupabaseConfigured } from '../sync';
+import { useConnectivityStore, useFinanceStore } from '../store';
 import { UserProfile, useAuthStore } from '../store/authStore';
 import { theme } from '../theme/theme';
 
@@ -136,9 +137,20 @@ export function SettingsScreen({
   const updateProfile = useAuthStore((state) => state.updateProfile);
   const signOut = useAuthStore((state) => state.signOut);
   const createInviteLink = useAuthStore((state) => state.createInviteLink);
+  const isBiometricAvailable = useAuthStore((state) => state.isBiometricAvailable);
+  const biometricLabel = useAuthStore((state) => state.biometricLabel);
+  const isBiometricEnabled = useAuthStore((state) => state.isBiometricEnabled);
+  const isBiometricProcessing = useAuthStore((state) => state.isBiometricProcessing);
+  const disableBiometricLogin = useAuthStore((state) => state.disableBiometricLogin);
   const isProfileSaving = useAuthStore((state) => state.isProfileSaving);
   const isCreatingInvite = useAuthStore((state) => state.isCreatingInvite);
   const storeError = useAuthStore((state) => state.error);
+  const isOnline = useConnectivityStore((state) => state.isOnline);
+  const pendingSyncCount = useFinanceStore((state) => state.pendingSyncCount);
+  const lastSyncAt = useFinanceStore((state) => state.lastSyncAt);
+  const isSyncing = useFinanceStore((state) => state.isSyncing);
+  const syncError = useFinanceStore((state) => state.syncError);
+  const syncNow = useFinanceStore((state) => state.syncNow);
 
   const [values, setValues] = useState<SettingsFormValues>(toFormValues(profile));
   const [errors, setErrors] = useState<SettingsFormErrors>({});
@@ -205,7 +217,47 @@ export function SettingsScreen({
     }
   }
 
+  async function handleDisableBiometrics(): Promise<void> {
+    setSubmitError(null);
+    setSuccessMessage(null);
+
+    try {
+      await disableBiometricLogin();
+      setSuccessMessage('Biometria desativada neste aparelho.');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : storeError);
+    }
+  }
+
+  async function handleSyncNow(): Promise<void> {
+    setSubmitError(null);
+    setSuccessMessage(null);
+
+    try {
+      await syncNow();
+      setSuccessMessage('Sincronização concluída.');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : syncError);
+    }
+  }
+
   const syncEnabled = isSupabaseConfigured();
+  const syncStatusValue = !syncEnabled
+    ? 'Local'
+    : isOnline
+      ? isSyncing
+        ? 'Sincronizando'
+        : 'Online'
+      : 'Offline';
+  const lastSyncLabel = lastSyncAt
+    ? new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(lastSyncAt))
+    : 'Ainda não sincronizou';
 
   return (
     <ScrollView
@@ -278,7 +330,7 @@ export function SettingsScreen({
       </AppCard>
 
       <SectionTitle>Segurança</SectionTitle>
-      <AppCard style={styles.preferenceCard}>
+      <AppCard style={styles.sectionCard}>
         <PreferenceRow
           description={
             session?.user.email
@@ -289,6 +341,34 @@ export function SettingsScreen({
           title="Sessão e acesso"
           value={session ? 'Ativa' : 'Inativa'}
         />
+
+        <PreferenceRow
+          description={
+            isBiometricAvailable
+              ? isBiometricEnabled
+                ? `${biometricLabel} está ativa neste aparelho para desbloqueio e login rápido.`
+                : `${biometricLabel} está disponível, mas ainda não foi configurada.`
+              : 'Nenhuma biometria cadastrada ou disponível neste aparelho.'
+          }
+          icon="smartphone"
+          title="Biometria"
+          value={isBiometricEnabled ? 'Ativa' : 'Inativa'}
+        />
+
+        {isBiometricEnabled ? (
+          <AppButton
+            disabled={isBiometricProcessing}
+            label={isBiometricProcessing ? 'Desativando...' : 'Desativar biometria'}
+            onPress={() => {
+              void handleDisableBiometrics();
+            }}
+            variant="secondary"
+          />
+        ) : (
+          <Text style={styles.memberHint}>
+            Para ativar a biometria, saia e entre novamente marcando a opção na tela de login.
+          </Text>
+        )}
       </AppCard>
 
       <SectionTitle>Espaço compartilhado</SectionTitle>
@@ -321,17 +401,35 @@ export function SettingsScreen({
       </AppCard>
 
       <SectionTitle>Backup e dados</SectionTitle>
-      <AppCard style={styles.preferenceCard}>
+      <AppCard style={styles.sectionCard}>
         <PreferenceRow
           description={
             syncEnabled
-              ? 'Sincronização com Supabase disponível, mantendo os dados locais compatíveis com a conta autenticada.'
+              ? isOnline
+                ? 'O app salva primeiro no SQLite e sincroniza com o Supabase assim que houver conexão.'
+                : 'Você está offline. O app continua salvando localmente e enviará a fila quando a internet voltar.'
               : 'Os dados continuam salvos localmente em SQLite até que as variáveis do Supabase sejam configuradas.'
           }
           icon="database"
           title="Armazenamento"
           value={syncEnabled ? 'Sync habilitado' : 'Somente local'}
         />
+        <PreferenceRow
+          description={`Fila pendente: ${pendingSyncCount} item${pendingSyncCount === 1 ? '' : 'ns'}. Última sync: ${lastSyncLabel}.`}
+          icon="refresh-cw"
+          title="Estado da sincronização"
+          value={syncStatusValue}
+        />
+        {syncEnabled ? (
+          <AppButton
+            disabled={isSyncing || !isOnline}
+            label={isSyncing ? 'Sincronizando...' : 'Sincronizar agora'}
+            onPress={() => {
+              void handleSyncNow();
+            }}
+            variant="secondary"
+          />
+        ) : null}
         <PreferenceRow
           description="Cadastre quem participa do controle financeiro para identificar titularidade das contas e responsabilidade das movimentações."
           icon="users"

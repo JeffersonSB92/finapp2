@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Feather } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppButton, AppCard } from '../components';
@@ -22,6 +23,12 @@ export function AuthScreen(): React.JSX.Element {
   const pendingInviteToken = useAuthStore((state) => state.pendingInviteToken);
   const setPendingInviteToken = useAuthStore((state) => state.setPendingInviteToken);
   const clearPendingInvite = useAuthStore((state) => state.clearPendingInvite);
+  const signInWithBiometrics = useAuthStore((state) => state.signInWithBiometrics);
+  const enableBiometricLogin = useAuthStore((state) => state.enableBiometricLogin);
+  const isBiometricAvailable = useAuthStore((state) => state.isBiometricAvailable);
+  const biometricLabel = useAuthStore((state) => state.biometricLabel);
+  const isBiometricEnabled = useAuthStore((state) => state.isBiometricEnabled);
+  const isBiometricProcessing = useAuthStore((state) => state.isBiometricProcessing);
   const isLoading = useAuthStore((state) => state.isLoading);
   const storeError = useAuthStore((state) => state.error);
 
@@ -29,6 +36,7 @@ export function AuthScreen(): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [inviteInput, setInviteInput] = useState('');
+  const [shouldEnableBiometrics, setShouldEnableBiometrics] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const helperText = useMemo(() => {
@@ -59,10 +67,16 @@ export function AuthScreen(): React.JSX.Element {
     try {
       if (mode === 'sign-in') {
         await signIn(email.trim(), password);
+        if (shouldEnableBiometrics && isBiometricAvailable) {
+          await enableBiometricLogin(email.trim(), password);
+        }
         return;
       }
 
       await signUp(email.trim(), password);
+      if (shouldEnableBiometrics && isBiometricAvailable) {
+        await enableBiometricLogin(email.trim(), password);
+      }
     } catch {
       return;
     }
@@ -124,6 +138,21 @@ export function AuthScreen(): React.JSX.Element {
         {localError ? <Text style={styles.error}>{localError}</Text> : null}
         {!localError && storeError ? <Text style={styles.error}>{storeError}</Text> : null}
 
+        {isBiometricEnabled ? (
+          <AppButton
+            disabled={isLoading || isBiometricProcessing}
+            label={
+              isBiometricProcessing
+                ? 'Validando biometria...'
+                : `Entrar com ${biometricLabel}`
+            }
+            onPress={() => {
+              void signInWithBiometrics();
+            }}
+            variant="secondary"
+          />
+        ) : null}
+
         <AppButton
           label={getActionLabel(mode)}
           loading={isLoading}
@@ -131,6 +160,33 @@ export function AuthScreen(): React.JSX.Element {
             void handleSubmit();
           }}
         />
+
+        {isBiometricAvailable && !isBiometricEnabled ? (
+          <View style={styles.biometricPreference}>
+            <View style={styles.biometricPreferenceText}>
+              <Text style={styles.biometricPreferenceTitle}>
+                Ativar {biometricLabel.toLowerCase()} neste aparelho
+              </Text>
+              <Text style={styles.biometricPreferenceSubtitle}>
+                Depois do primeiro acesso, você poderá entrar mais rápido e também desbloquear o app.
+              </Text>
+            </View>
+
+            <AppButton
+              iconLeft={
+                <Feather
+                  color={shouldEnableBiometrics ? theme.colors.brand.white : theme.colors.brand.primary}
+                  name={shouldEnableBiometrics ? 'check-square' : 'square'}
+                  size={16}
+                />
+              }
+              label={shouldEnableBiometrics ? 'Ativado' : 'Ativar'}
+              onPress={() => setShouldEnableBiometrics((current) => !current)}
+              size="sm"
+              variant={shouldEnableBiometrics ? 'primary' : 'secondary'}
+            />
+          </View>
+        ) : null}
 
         <AppButton
           disabled={isLoading}
@@ -216,5 +272,30 @@ const styles = StyleSheet.create({
   },
   secondaryAction: {
     alignSelf: 'center',
+  },
+  biometricPreference: {
+    alignItems: 'center',
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.radii.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  biometricPreferenceText: {
+    flex: 1,
+    gap: theme.spacing.xxs,
+  },
+  biometricPreferenceTitle: {
+    color: theme.colors.text.primary,
+    fontFamily: theme.fonts.family.semibold,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
+  },
+  biometricPreferenceSubtitle: {
+    color: theme.colors.text.secondary,
+    fontFamily: theme.fonts.family.regular,
+    fontSize: theme.fonts.size.sm,
+    lineHeight: theme.fonts.lineHeight.sm,
   },
 });

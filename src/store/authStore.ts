@@ -10,6 +10,16 @@ import {
   setCurrentDatabaseUserId,
 } from '../database';
 import { getSupabaseClient, syncService } from '../sync';
+import {
+  clearBiometricCredentials,
+  getBiometricAvailability,
+  getBiometricCredentials,
+  getBiometricLoginEnabled,
+  requestBiometricAuthentication,
+  saveBiometricCredentials,
+  setBiometricLoginEnabled,
+  updateBiometricCredentialEmail,
+} from '../utils/biometric';
 import { useFinanceStore } from './financeStore';
 
 export interface UserProfile {
@@ -31,6 +41,11 @@ interface AuthState {
   session: Session | null;
   profile: UserProfile | null;
   household: HouseholdContext | null;
+  isBiometricAvailable: boolean;
+  biometricLabel: string;
+  isBiometricEnabled: boolean;
+  isBiometricUnlocked: boolean;
+  isBiometricProcessing: boolean;
   pendingInviteToken: string | null;
   isLoading: boolean;
   isProfileSaving: boolean;
@@ -42,6 +57,11 @@ interface AuthState {
   signOut: () => Promise<void>;
   updateProfile: (input: UserProfile) => Promise<void>;
   createInviteLink: () => Promise<string>;
+  enableBiometricLogin: (email: string, password: string) => Promise<void>;
+  disableBiometricLogin: () => Promise<void>;
+  signInWithBiometrics: () => Promise<void>;
+  unlockWithBiometrics: () => Promise<void>;
+  lockBiometricSession: () => void;
   setPendingInviteToken: (token: string | null) => void;
   clearPendingInvite: () => void;
 }
@@ -204,6 +224,20 @@ async function applySessionSafely(
 
     return 'Não foi possível preparar os dados locais para esta sessão.';
   }
+}
+
+async function refreshBiometricState(session: Session | null): Promise<void> {
+  const availability = await getBiometricAvailability();
+  const isEnabled = availability.isAvailable
+    ? await getBiometricLoginEnabled()
+    : false;
+
+  useAuthStore.setState({
+    isBiometricAvailable: availability.isAvailable,
+    biometricLabel: availability.label,
+    isBiometricEnabled: isEnabled,
+    isBiometricUnlocked: !session || !isEnabled,
+  });
 }
 
 function mapMembershipRow(row: HouseholdMembershipRow): HouseholdContext | null {
@@ -482,6 +516,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   profile: null,
   household: null,
+  isBiometricAvailable: false,
+  biometricLabel: 'Biometria',
+  isBiometricEnabled: false,
+  isBiometricUnlocked: true,
+  isBiometricProcessing: false,
   pendingInviteToken: null,
   isLoading: true,
   isProfileSaving: false,
@@ -492,6 +531,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const client = getSupabaseClient();
 
     if (!client) {
+      await refreshBiometricState(null);
       set({
         profile: null,
         household: null,
@@ -533,6 +573,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (authInitialized) {
       const currentSession = useAuthStore.getState().session;
+      await refreshBiometricState(currentSession);
       set({
         isLoading: false,
         profile: buildUserProfile(currentSession),
@@ -562,6 +603,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isLoading: false,
       error: null,
     });
+    await refreshBiometricState(session);
     await syncSessionContext(session);
 
     client.auth.onAuthStateChange((
@@ -574,6 +616,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         error: null,
       });
+      void refreshBiometricState(nextSession);
       void syncSessionContext(nextSession);
     });
 
@@ -604,6 +647,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isLoading: false,
       error: null,
     });
+    await refreshBiometricState(session);
     await syncSessionContext(session);
   },
 
@@ -632,6 +676,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         error: null,
       });
+      await refreshBiometricState(session);
       await syncSessionContext(session);
       return;
     }
@@ -652,6 +697,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       setCurrentAuthenticatedUserId(null);
       setCurrentDatabaseUserId(null);
       useFinanceStore.getState().resetForSession();
+      await refreshBiometricState(null);
       set({
         session: null,
         profile: null,
@@ -681,6 +727,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isCreatingInvite: false,
       error: null,
     });
+    await refreshBiometricState(null);
     await syncSessionContext(null);
   },
 
@@ -718,6 +765,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isProfileSaving: false,
       error: null,
     });
+
+    if (get().isBiometricEnabled) {
+      await updateBiometricCredentialEmail(input.email.trim());
+    }
   },
 
   createInviteLink: async () => {
@@ -760,6 +811,119 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ isCreatingInvite: false, error: message });
       throw new Error(message);
+    }
+  },
+
+  enableBiometricLogin: async (email, password) => {
+    const availability = await getBiometricAvailability();
+
+    if (!availability.isAvailable) {
+      throw new Error('Nenhuma biometria está disponível neste aparelho.');
+    }
+
+    set({ isBiometricProcessing: true, error: null });
+
+    try {
+      await requestBiometricAuthentication(`Autorize o uso de ${availability.label}`);
+      await saveBiometricCredentials(email.trim(), password);
+      await setBiometricLoginEnabled(true);
+      await refreshBiometricState(get().session);
+      set({ isBiometricProcessing: false, error: null });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível ativar a biometria neste aparelho.';
+
+      set({ isBiometricProcessing: false, error: message });
+      throw new Error(message);
+    }
+  },
+
+  disableBiometricLogin: async () => {
+    set({ isBiometricProcessing: true, error: null });
+
+    try {
+      await clearBiometricCredentials();
+      await refreshBiometricState(get().session);
+      set({ isBiometricProcessing: false, error: null });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível desativar a biometria.';
+
+      set({ isBiometricProcessing: false, error: message });
+      throw new Error(message);
+    }
+  },
+
+  signInWithBiometrics: async () => {
+    const availability = await getBiometricAvailability();
+
+    if (!availability.isAvailable) {
+      throw new Error('Nenhuma biometria está disponível neste aparelho.');
+    }
+
+    set({ isBiometricProcessing: true, error: null });
+
+    try {
+      await requestBiometricAuthentication(`Entre com ${availability.label}`);
+      const credentials = await getBiometricCredentials();
+
+      if (!credentials) {
+        throw new Error('Nenhum login biométrico foi configurado neste aparelho.');
+      }
+
+      await get().signIn(credentials.email, credentials.password);
+      set({ isBiometricProcessing: false, error: null });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível entrar com biometria.';
+
+      set({ isBiometricProcessing: false, error: message });
+      throw new Error(message);
+    }
+  },
+
+  unlockWithBiometrics: async () => {
+    const session = get().session;
+    const availability = await getBiometricAvailability();
+
+    if (!session) {
+      set({ isBiometricUnlocked: true });
+      return;
+    }
+
+    if (!availability.isAvailable) {
+      throw new Error('Nenhuma biometria está disponível neste aparelho.');
+    }
+
+    set({ isBiometricProcessing: true, error: null });
+
+    try {
+      await requestBiometricAuthentication(`Desbloqueie com ${availability.label}`);
+      set({
+        isBiometricUnlocked: true,
+        isBiometricProcessing: false,
+        error: null,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível desbloquear o app com biometria.';
+
+      set({ isBiometricProcessing: false, error: message });
+      throw new Error(message);
+    }
+  },
+
+  lockBiometricSession: () => {
+    if (get().session && get().isBiometricEnabled) {
+      set({ isBiometricUnlocked: false });
     }
   },
 

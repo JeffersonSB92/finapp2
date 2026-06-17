@@ -35,7 +35,7 @@ import {
   SubcategoryFormScreen,
 } from './src/screens';
 import { useAuthStore } from './src/store/authStore';
-import { useFinanceStore } from './src/store';
+import { useConnectivityStore, useFinanceStore } from './src/store';
 import { theme } from './src/theme/theme';
 
 type AppRoute =
@@ -101,9 +101,19 @@ export default function App(): React.JSX.Element {
   const initializeAuth = useAuthStore((state) => state.initialize);
   const authSession = useAuthStore((state) => state.session);
   const authProfile = useAuthStore((state) => state.profile);
+  const authHousehold = useAuthStore((state) => state.household);
+  const isBiometricEnabled = useAuthStore((state) => state.isBiometricEnabled);
+  const isBiometricUnlocked = useAuthStore((state) => state.isBiometricUnlocked);
+  const isBiometricProcessing = useAuthStore((state) => state.isBiometricProcessing);
+  const biometricLabel = useAuthStore((state) => state.biometricLabel);
+  const unlockWithBiometrics = useAuthStore((state) => state.unlockWithBiometrics);
   const isAuthLoading = useAuthStore((state) => state.isLoading);
   const initializeFinance = useFinanceStore((state) => state.initialize);
+  const isFinanceInitialized = useFinanceStore((state) => state.isInitialized);
+  const syncNow = useFinanceStore((state) => state.syncNow);
   const financeError = useFinanceStore((state) => state.error);
+  const initializeConnectivity = useConnectivityStore((state) => state.initialize);
+  const isOnline = useConnectivityStore((state) => state.isOnline);
   const [route, setRoute] = useState<AppRoute>('dashboard');
   const [editingTransactionId, setEditingTransactionId] = useState<number | undefined>();
   const [editingCategoryId, setEditingCategoryId] = useState<number | undefined>();
@@ -118,6 +128,10 @@ export default function App(): React.JSX.Element {
   }, [initializeAuth]);
 
   useEffect(() => {
+    void initializeConnectivity();
+  }, [initializeConnectivity]);
+
+  useEffect(() => {
     if (!authSession) {
       setRoute('dashboard');
       setEditingCategoryId(undefined);
@@ -129,6 +143,10 @@ export default function App(): React.JSX.Element {
       return;
     }
 
+    if (!authHousehold) {
+      return;
+    }
+
     setRoute('dashboard');
     setEditingCategoryId(undefined);
     setEditingSubcategoryId(undefined);
@@ -137,11 +155,19 @@ export default function App(): React.JSX.Element {
     setSelectedCategoryId(undefined);
     setIsFabOpen(false);
     void initializeFinance();
-  }, [authSession, initializeFinance]);
+  }, [authHousehold, authSession, initializeFinance]);
 
   useEffect(() => {
     setIsFabOpen(false);
   }, [route]);
+
+  useEffect(() => {
+    if (!authSession || !authHousehold || !isFinanceInitialized || !isOnline) {
+      return;
+    }
+
+    void syncNow();
+  }, [authHousehold, authSession, isFinanceInitialized, isOnline, syncNow]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -154,6 +180,12 @@ export default function App(): React.JSX.Element {
   }, []);
 
   const shouldShowFab = route === 'dashboard';
+  const isSessionContextReady = !authSession || authHousehold !== null;
+  const shouldShowBiometricLock =
+    Boolean(authSession) &&
+    isSessionContextReady &&
+    isBiometricEnabled &&
+    !isBiometricUnlocked;
   const activeTabRoute: TabOption['route'] = (() => {
     if (route === 'analytics') {
       return 'analytics';
@@ -441,7 +473,36 @@ export default function App(): React.JSX.Element {
 
           {!isAuthLoading && !authSession ? <AuthScreen /> : null}
 
-          {!isAuthLoading && authSession ? (
+          {!isAuthLoading && authSession && !isSessionContextReady ? (
+            <View style={styles.centeredState}>
+              <ActivityIndicator color={theme.colors.brand.primary} />
+              <Text style={styles.centeredStateText}>Preparando seu espaço financeiro...</Text>
+            </View>
+          ) : null}
+
+          {!isAuthLoading && authSession && isSessionContextReady && shouldShowBiometricLock ? (
+            <View style={styles.centeredState}>
+              <ActivityIndicator
+                animating={isBiometricProcessing}
+                color={theme.colors.brand.primary}
+              />
+              <Text style={styles.centeredStateText}>
+                Desbloqueie o app com {biometricLabel.toLowerCase()} para continuar.
+              </Text>
+              <AppButton
+                disabled={isBiometricProcessing}
+                label={isBiometricProcessing ? 'Validando...' : 'Desbloquear'}
+                onPress={() => {
+                  void unlockWithBiometrics();
+                }}
+              />
+            </View>
+          ) : null}
+
+          {!isAuthLoading &&
+          authSession &&
+          isSessionContextReady &&
+          !shouldShowBiometricLock ? (
             <View style={styles.container}>
               <View style={styles.sessionHeader}>
                 <View style={styles.sessionIdentity}>
