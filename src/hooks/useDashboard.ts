@@ -173,6 +173,10 @@ function isPaidExpense(amountType: TransactionType, isPaid: boolean): boolean {
   return amountType === TransactionType.EXPENSE && isPaid;
 }
 
+function isPaidIncome(amountType: TransactionType, isPaid: boolean): boolean {
+  return amountType === TransactionType.INCOME && isPaid;
+}
+
 export function useDashboard(): UseDashboardResult {
   const [referenceDate, setReferenceDate] = useState<Date>(getCurrentMonthDate());
 
@@ -229,6 +233,18 @@ export function useDashboard(): UseDashboardResult {
   const totalDespesas = useMemo(
     () =>
       monthTransactions.reduce((total, transaction) => {
+        if (transaction.type !== TransactionType.EXPENSE) {
+          return total;
+        }
+
+        return total + transaction.amount;
+      }, 0),
+    [monthTransactions],
+  );
+
+  const despesasPagas = useMemo(
+    () =>
+      monthTransactions.reduce((total, transaction) => {
         if (!isPaidExpense(transaction.type, transaction.is_paid)) {
           return total;
         }
@@ -238,7 +254,19 @@ export function useDashboard(): UseDashboardResult {
     [monthTransactions],
   );
 
-  const saldoAtual = saldoEmConta + totalReceitas - totalDespesas;
+  const receitasPagas = useMemo(
+    () =>
+      monthTransactions.reduce((total, transaction) => {
+        if (!isPaidIncome(transaction.type, transaction.is_paid)) {
+          return total;
+        }
+
+        return total + transaction.amount;
+      }, 0),
+    [monthTransactions],
+  );
+
+  const saldoAtual = saldoEmConta + receitasPagas - despesasPagas;
 
   const monthlyPlanningTotal = useMemo(
     () =>

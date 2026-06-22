@@ -21,7 +21,6 @@ export function calculateCategorySpending(
   const monthExpenses = input.transactions.filter(
     (transaction) =>
       transaction.type === TransactionType.EXPENSE &&
-      transaction.is_paid &&
       isSameLocalMonth(transaction.transaction_date, referenceDate),
   );
 

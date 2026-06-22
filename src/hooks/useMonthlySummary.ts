@@ -1,7 +1,9 @@
 import { useEffect, useMemo } from 'react';
 
 import { calculateMonthlyComparison } from '../domain';
+import { TransactionType } from '../database';
 import { useFinanceStore } from '../store';
+import { isSameLocalMonth } from '../utils/date';
 
 type TrendDirection = 'up' | 'down' | 'stable';
 
@@ -102,6 +104,14 @@ export function useMonthlySummary({
     [referenceDate, transactions],
   );
 
+  const currentMonthTransactions = useMemo(
+    () =>
+      transactions.filter((transaction) =>
+        isSameLocalMonth(transaction.transaction_date, referenceDate),
+      ),
+    [referenceDate, transactions],
+  );
+
   const peakValue = useMemo(() => {
     const values = comparison.flatMap((item) => [item.receitas, item.despesas]);
     return Math.max(...values, 0);
@@ -123,12 +133,26 @@ export function useMonthlySummary({
 
   const totalReceitas = currentMonth?.receitas ?? 0;
   const totalDespesas = currentMonth?.despesas ?? 0;
+  const receitasPagas = currentMonthTransactions.reduce((total, transaction) => {
+    if (transaction.type !== TransactionType.INCOME || !transaction.is_paid) {
+      return total;
+    }
+
+    return total + transaction.amount;
+  }, 0);
+  const despesasPagas = currentMonthTransactions.reduce((total, transaction) => {
+    if (transaction.type !== TransactionType.EXPENSE || !transaction.is_paid) {
+      return total;
+    }
+
+    return total + transaction.amount;
+  }, 0);
 
   return {
     bars,
     totalReceitas: formatCurrency(totalReceitas),
     totalDespesas: formatCurrency(totalDespesas),
-    saldo: formatCurrency(totalReceitas - totalDespesas),
+    saldo: formatCurrency(receitasPagas - despesasPagas),
     revenueTrend: getTrendIndicator(
       totalReceitas,
       previousMonth?.receitas ?? 0,

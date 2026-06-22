@@ -26,6 +26,14 @@ function isPaidExpense(transaction: PayableTransaction): boolean {
   return transaction.is_paid === true;
 }
 
+function isPaidIncome(transaction: PayableTransaction): boolean {
+  if (transaction.type !== TransactionType.INCOME) {
+    return false;
+  }
+
+  return transaction.is_paid === true;
+}
+
 export function calculateFinanceSummary(
   input: CalculateFinanceSummaryInput,
 ): FinanceSummary {
@@ -51,6 +59,14 @@ export function calculateFinanceSummary(
   }, 0);
 
   const totalDespesas = monthTransactions.reduce((total, transaction) => {
+    if (transaction.type !== TransactionType.EXPENSE) {
+      return total;
+    }
+
+    return total + transaction.amount;
+  }, 0);
+
+  const despesasPagas = monthTransactions.reduce((total, transaction) => {
     if (!isPaidExpense(transaction)) {
       return total;
     }
@@ -58,7 +74,15 @@ export function calculateFinanceSummary(
     return total + transaction.amount;
   }, 0);
 
-  const saldoAtual = saldoEmConta + totalReceitas - totalDespesas;
+  const receitasPagas = monthTransactions.reduce((total, transaction) => {
+    if (!isPaidIncome(transaction)) {
+      return total;
+    }
+
+    return total + transaction.amount;
+  }, 0);
+
+  const saldoAtual = saldoEmConta + receitasPagas - despesasPagas;
 
   return {
     saldoAtual,

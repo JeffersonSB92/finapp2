@@ -61,10 +61,6 @@ export function calculateMonthlyComparison(
         }
 
         if (transaction.type === TransactionType.EXPENSE) {
-          if (!transaction.is_paid) {
-            return accumulator;
-          }
-
           accumulator.despesas += transaction.amount;
         }
 
